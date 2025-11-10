@@ -72,7 +72,7 @@ Tous les requis "Must have" (FR-01 à FR-15) sont implémentés avec des technol
 
 - MediaPipe Pose est chargé depuis un CDN pour la simplicité
 - L'analyse posturale fonctionne directement dans le navigateur
-- La génération de plans utilise des règles simples (peut être améliorée avec ML)
+- La génération de plans utilise des règles simples et ML
 - Le chat IA nécessite une clé OpenAI API (optionnel, fonctionne sans avec réponses basiques)
 
 
