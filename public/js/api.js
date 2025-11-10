@@ -98,10 +98,14 @@ class API {
 
     // Auth
     async register(email, password, name) {
-        return this.request('/api/auth/register', {
+        const data = await this.request('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({ email, password, name })
         });
+        if (data.token) {
+            this.setToken(data.token);
+        }
+        return data;
     }
 
     async login(email, password) {
