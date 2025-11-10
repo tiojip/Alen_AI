@@ -690,6 +690,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 constraints: document.getElementById('profile-constraints').value
             });
             
+            // Recharger le profil pour refléter les données sauvegardées et éviter la réinitialisation des champs
+            await loadProfile();
+            
             // Vérifier si on doit passer à l'étape suivante du workflow (nouvel utilisateur)
             if (typeof advanceWorkflow === 'function') {
                 // Attendre un peu pour que le profil soit bien sauvegardé
