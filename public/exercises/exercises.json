@@ -1,0 +1,661 @@
+{
+  "exercises": [
+    {
+      "id": 1,
+      "name": "Squats",
+      "description": "Descendez en pliant les genoux jusqu'à ce que vos cuisses soient parallèles au sol, puis remontez.",
+      "muscles": ["Quadriceps", "Fessiers", "Ischio-jambiers"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNG1ic2VqZXkzdHpxOWV2dXAxb3duaGd2ZmhvOThlZm5ndmlsMmR3byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tHyPJtOwPChKmF0LKg/giphy.gif",
+      "gif": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExNG1ic2VqZXkzdHpxOWV2dXAxb3duaGd2ZmhvOThlZm5ndmlsMmR3byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tHyPJtOwPChKmF0LKg/giphy.gif",
+      "instructions": [
+        "Tenez-vous debout, pieds écartés à la largeur des épaules",
+        "Descendez en pliant les genoux",
+        "Gardez le dos droit et les genoux alignés avec les orteils",
+        "Remontez en contractant les fessiers"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Push-ups",
+      "description": "Descendez votre corps jusqu'à presque toucher le sol, puis poussez pour remonter.",
+      "muscles": ["Pectoraux", "Triceps", "Épaules"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3c3dW04bjJxdjFsMG1xZTdtZnVtMGh3dmpkbWU4NTVmcDZvam5qZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5t9IcXiBCyw60XPpGu/giphy.gif",
+      "gif": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExc3c3dW04bjJxdjFsMG1xZTdtZnVtMGh3dmpkbWU4NTVmcDZvam5qZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5t9IcXiBCyw60XPpGu/giphy.gif",
+      "instructions": [
+        "Position de planche, mains à la largeur des épaules",
+        "Descendez en pliant les bras",
+        "Gardez le corps aligné",
+        "Remontez en poussant"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Planche",
+      "description": "Maintenez la position de planche avec le dos droit et les abdos contractés.",
+      "muscles": ["Abdominaux", "Épaules", "Dos"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMHFmZ3NiZmk0NGQ5MTNqbnNzcjJiaWZ1a2RnMjM4ejRxdDRhb3k0YSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TmkRlf0XjWy1AJzySz/giphy.gif",
+      "gif": "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMHFmZ3NiZmk0NGQ5MTNqbnNzcjJiaWZ1a2RnMjM4ejRxdDRhb3k0YSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/TmkRlf0XjWy1AJzySz/giphy.gif",
+      "instructions": [
+        "Position de planche sur les avant-bras",
+        "Corps aligné de la tête aux pieds",
+        "Contractez les abdos",
+        "Maintenez la position"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Fentes",
+      "description": "Faites un grand pas en avant et descendez jusqu'à ce que les deux genoux soient à 90°.",
+      "muscles": ["Quadriceps", "Fessiers", "Ischio-jambiers"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbWxlb3d1ZTQ1OXk0OWdsYWswZm82ZThxYTVlMzVndDU1cjltMnN4byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/UHo4sKHPp9Rao/giphy.gif",
+      "gif": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbWxlb3d1ZTQ1OXk0OWdsYWswZm82ZThxYTVlMzVndDU1cjltMnN4byZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/UHo4sKHPp9Rao/giphy.gif",
+      "instructions": [
+        "Faites un grand pas en avant",
+        "Descendez jusqu'à ce que le genou arrière touche presque le sol",
+        "Les deux genoux doivent être à 90°",
+        "Remontez et répétez de l'autre côté"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Burpees",
+      "description": "Mouvement complet combinant squat, planche et saut.",
+      "muscles": ["Tout le corps"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdGRzZXBlZzhkNDcyOWpieHU2YXpoYW1pY20zNTFvNzY3b3V3eGQ2ciZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l41YgS3UPP5Qjwr8Q/giphy.gif",
+      "gif": "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExdGRzZXBlZzhkNDcyOWpieHU2YXpoYW1pY20zNTFvNzY3b3V3eGQ2ciZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l41YgS3UPP5Qjwr8Q/giphy.gif",
+      "instructions": [
+        "Accroupissez-vous",
+        "Sautez en position de planche",
+        "Faites un push-up",
+        "Revenez en position accroupie",
+        "Sautez en l'air"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Mountain Climbers",
+      "description": "En position de planche, alternez rapidement les genoux vers la poitrine.",
+      "muscles": ["Abdominaux", "Épaules", "Cardio"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExdG9rOThhdmdsOXBqdDkzaXVsZmRjYWhjaGdrNTZ0ZzRkY2QwbWMyeSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l2RnAY30gjJ6ukKJy/giphy.gif",
+      "gif": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExdG9rOThhdmdsOXBqdDkzaXVsZmRjYWhjaGdrNTZ0ZzRkY2QwbWMyeSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l2RnAY30gjJ6ukKJy/giphy.gif",
+      "instructions": [
+        "Position de planche",
+        "Alternez les genoux rapidement",
+        "Gardez le dos droit",
+        "Rythme soutenu"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Pompes inclinées",
+      "description": "Push-ups avec les mains surélevées (plus facile pour débutants).",
+      "muscles": ["Pectoraux", "Triceps"],
+      "level": "beginner",
+      "equipment": "chair",
+      "video": "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExamRyNm55MWVka2I2NnAxemd6eGpreW44Y2hqbHBkMGF5cXlpdWYybiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/HZqfCJII5tz7zSLq0K/giphy.gif",
+      "gif": "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExamRyNm55MWVka2I2NnAxemd6eGpreW44Y2hqbHBkMGF5cXlpdWYybiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/HZqfCJII5tz7zSLq0K/giphy.gif",
+      "instructions": [
+        "Mains sur une surface surélevée",
+        "Corps incliné",
+        "Descendez et remontez",
+        "Plus facile que les pompes classiques"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Planche latérale",
+      "description": "Maintenez la position de planche sur le côté.",
+      "muscles": ["Abdominaux obliques", "Épaules"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3Vhb21obXEzM3Byd29zd3ZnZ25jZ2lwY2JtbTRyZmljdzJrOWE1ZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/A1GA05n3TtsKaXAa5q/giphy.gif",
+      "gif": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExN3Vhb21obXEzM3Byd29zd3ZnZ25jZ2lwY2JtbTRyZmljdzJrOWE1ZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/A1GA05n3TtsKaXAa5q/giphy.gif",
+      "instructions": [
+        "Couché sur le côté",
+        "Appui sur un avant-bras",
+        "Corps aligné",
+        "Maintenez la position"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Squats sautés",
+      "description": "Squats avec saut explosif à la fin du mouvement.",
+      "muscles": ["Quadriceps", "Fessiers", "Cardio"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-jumpsquat.gif",
+      "gif": "https://i.imgur.com/example-jumpsquat.gif",
+      "instructions": [
+        "Position de squat",
+        "Descendez en squat",
+        "Sautez explosivement",
+        "Atterrissez en douceur"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Pompes diamant",
+      "description": "Push-ups avec les mains formant un diamant (ciblant les triceps).",
+      "muscles": ["Triceps", "Pectoraux"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-diamond.gif",
+      "gif": "https://i.imgur.com/example-diamond.gif",
+      "instructions": [
+        "Position de planche",
+        "Mains formant un diamant",
+        "Descendez lentement",
+        "Remontez en contractant les triceps"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Gainage",
+      "description": "Maintenez la position de planche sur les avant-bras.",
+      "muscles": ["Abdominaux", "Épaules"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://i.imgur.com/example-gainage.gif",
+      "gif": "https://i.imgur.com/example-gainage.gif",
+      "instructions": [
+        "Position de planche sur avant-bras",
+        "Corps droit",
+        "Contractez les abdos",
+        "Maintenez 30-60 secondes"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Fentes sautées",
+      "description": "Fentes alternées avec saut entre chaque répétition.",
+      "muscles": ["Quadriceps", "Fessiers", "Cardio"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-jumplunge.gif",
+      "gif": "https://i.imgur.com/example-jumplunge.gif",
+      "instructions": [
+        "Position de fente",
+        "Sautez en changeant de jambe",
+        "Atterrissez en fente",
+        "Répétez rapidement"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Pompes sur une main",
+      "description": "Push-ups effectués avec une seule main (très avancé).",
+      "muscles": ["Pectoraux", "Triceps", "Épaules"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-onehand.gif",
+      "gif": "https://i.imgur.com/example-onehand.gif",
+      "instructions": [
+        "Position de planche",
+        "Une main derrière le dos",
+        "Descendez lentement",
+        "Remontez avec contrôle"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Planche dynamique",
+      "description": "Planche avec mouvement alterné des genoux vers la poitrine.",
+      "muscles": ["Abdominaux", "Épaules"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-dynamicplank.gif",
+      "gif": "https://i.imgur.com/example-dynamicplank.gif",
+      "instructions": [
+        "Position de planche",
+        "Amenez un genou vers la poitrine",
+        "Retournez en planche",
+        "Alternez les genoux"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Pompes sur les genoux",
+      "description": "Push-ups modifiés pour débutants, genoux au sol.",
+      "muscles": ["Pectoraux", "Triceps"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://i.imgur.com/example-kneepushup.gif",
+      "gif": "https://i.imgur.com/example-kneepushup.gif",
+      "instructions": [
+        "Position de planche sur genoux",
+        "Descendez en pliant les bras",
+        "Gardez le dos droit",
+        "Remontez"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Squats bulgares",
+      "description": "Squats avec une jambe arrière surélevée.",
+      "muscles": ["Quadriceps", "Fessiers"],
+      "level": "intermediate",
+      "equipment": "chair",
+      "video": "https://i.imgur.com/example-bulgarian.gif",
+      "gif": "https://i.imgur.com/example-bulgarian.gif",
+      "instructions": [
+        "Pied arrière sur surface surélevée",
+        "Descendez en squat",
+        "Genou avant à 90°",
+        "Remontez"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Pompes en T",
+      "description": "Push-ups avec rotation du corps en position T.",
+      "muscles": ["Pectoraux", "Abdominaux", "Épaules"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-tpushup.gif",
+      "gif": "https://i.imgur.com/example-tpushup.gif",
+      "instructions": [
+        "Push-up classique",
+        "En remontant, pivotez en T",
+        "Un bras vers le ciel",
+        "Retournez et répétez"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Squats sumo",
+      "description": "Squats avec jambes très écartées, ciblant l'intérieur des cuisses.",
+      "muscles": ["Quadriceps", "Adducteurs", "Fessiers"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-sumo.gif",
+      "gif": "https://i.imgur.com/example-sumo.gif",
+      "instructions": [
+        "Pieds très écartés, pointés vers l'extérieur",
+        "Descendez en squat",
+        "Genoux vers l'extérieur",
+        "Remontez"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Pompes déclinées",
+      "description": "Push-ups avec les pieds surélevés (plus difficile).",
+      "muscles": ["Pectoraux", "Triceps", "Épaules"],
+      "level": "advanced",
+      "equipment": "chair",
+      "video": "https://i.imgur.com/example-decline.gif",
+      "gif": "https://i.imgur.com/example-decline.gif",
+      "instructions": [
+        "Pieds sur surface surélevée",
+        "Mains au sol",
+        "Descendez lentement",
+        "Remontez avec force"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Planche avec élévation de jambe",
+      "description": "Planche avec élévation alternée des jambes.",
+      "muscles": ["Abdominaux", "Fessiers", "Épaules"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-plankleg.gif",
+      "gif": "https://i.imgur.com/example-plankleg.gif",
+      "instructions": [
+        "Position de planche",
+        "Levez une jambe",
+        "Maintenez 2 secondes",
+        "Alternez les jambes"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Squats pistol",
+      "description": "Squats sur une seule jambe (très avancé).",
+      "muscles": ["Quadriceps", "Fessiers", "Équilibre"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-pistol.gif",
+      "gif": "https://i.imgur.com/example-pistol.gif",
+      "instructions": [
+        "Une jambe tendue devant",
+        "Descendez en squat sur l'autre",
+        "Équilibre et contrôle",
+        "Remontez"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Pompes avec clap",
+      "description": "Push-ups explosifs avec clap des mains.",
+      "muscles": ["Pectoraux", "Triceps", "Explosivité"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-clap.gif",
+      "gif": "https://i.imgur.com/example-clap.gif",
+      "instructions": [
+        "Push-up explosif",
+        "Poussez fort pour décoller",
+        "Clap des mains",
+        "Atterrissez en douceur"
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Gainage latéral avec élévation",
+      "description": "Planche latérale avec élévation de la jambe.",
+      "muscles": ["Abdominaux obliques", "Fessiers"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-sideplankleg.gif",
+      "gif": "https://i.imgur.com/example-sideplankleg.gif",
+      "instructions": [
+        "Planche latérale",
+        "Levez la jambe supérieure",
+        "Maintenez la position",
+        "Alternez les côtés"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Squats avec saut en étoile",
+      "description": "Squats sautés avec écartement des jambes et bras.",
+      "muscles": ["Quadriceps", "Fessiers", "Cardio"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-starsquat.gif",
+      "gif": "https://i.imgur.com/example-starsquat.gif",
+      "instructions": [
+        "Squat classique",
+        "Sautez en écartant jambes et bras",
+        "Forme d'étoile",
+        "Retour en squat"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Pompes en archer",
+      "description": "Push-ups avec déplacement du poids d'un côté.",
+      "muscles": ["Pectoraux", "Triceps", "Épaules"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-archer.gif",
+      "gif": "https://i.imgur.com/example-archer.gif",
+      "instructions": [
+        "Position de planche large",
+        "Déplacez le poids vers un bras",
+        "Descendez de ce côté",
+        "Alternez"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Planche avec rotation",
+      "description": "Planche avec rotation du corps vers le côté.",
+      "muscles": ["Abdominaux", "Obliques", "Épaules"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-rotateplank.gif",
+      "gif": "https://i.imgur.com/example-rotateplank.gif",
+      "instructions": [
+        "Position de planche",
+        "Pivotez vers le côté",
+        "Un bras vers le ciel",
+        "Retournez et alternez"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Squats avec élévation des genoux",
+      "description": "Squats avec élévation alternée des genoux.",
+      "muscles": ["Quadriceps", "Fessiers", "Cardio"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-kneelift.gif",
+      "gif": "https://i.imgur.com/example-kneelift.gif",
+      "instructions": [
+        "Squat classique",
+        "En remontant, levez un genou",
+        "Alternez les genoux",
+        "Rythme modéré"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Pompes avec rotation",
+      "description": "Push-ups avec rotation du torse à la fin.",
+      "muscles": ["Pectoraux", "Abdominaux", "Obliques"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-rotatepushup.gif",
+      "gif": "https://i.imgur.com/example-rotatepushup.gif",
+      "instructions": [
+        "Push-up classique",
+        "En remontant, pivotez",
+        "Un bras vers le ciel",
+        "Retournez et répétez"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Gainage Superman",
+      "description": "Position allongée ventre, levez les bras et jambes.",
+      "muscles": ["Dos", "Fessiers", "Épaules"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://i.imgur.com/example-superman.gif",
+      "gif": "https://i.imgur.com/example-superman.gif",
+      "instructions": [
+        "Allongé sur le ventre",
+        "Levez les bras et jambes",
+        "Maintenez la position",
+        "Contractez le dos"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "Squats avec saut latéral",
+      "description": "Squats avec saut latéral alterné.",
+      "muscles": ["Quadriceps", "Fessiers", "Cardio"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-lateralsquat.gif",
+      "gif": "https://i.imgur.com/example-lateralsquat.gif",
+      "instructions": [
+        "Squat classique",
+        "Sautez vers la droite",
+        "Squat, puis sautez à gauche",
+        "Alternez rapidement"
+      ]
+    },
+    {
+      "id": 31,
+      "name": "Pompes en diamant sautées",
+      "description": "Pompes diamant avec saut explosif.",
+      "muscles": ["Triceps", "Pectoraux", "Explosivité"],
+      "level": "advanced",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-jumpdiamond.gif",
+      "gif": "https://i.imgur.com/example-jumpdiamond.gif",
+      "instructions": [
+        "Position diamant",
+        "Push-up explosif",
+        "Décollez les mains",
+        "Atterrissez en position"
+      ]
+    },
+    {
+      "id": 32,
+      "name": "Planche avec toucher d'épaule",
+      "description": "Planche avec alternance de toucher des épaules.",
+      "muscles": ["Abdominaux", "Épaules", "Stabilité"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-shouldertap.gif",
+      "gif": "https://i.imgur.com/example-shouldertap.gif",
+      "instructions": [
+        "Position de planche",
+        "Touchez une épaule",
+        "Retournez la main",
+        "Alternez rapidement"
+      ]
+    },
+    {
+      "id": 33,
+      "name": "Squats avec extension de jambe",
+      "description": "Squats avec extension d'une jambe sur le côté.",
+      "muscles": ["Quadriceps", "Fessiers", "Abducteurs"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-legout.gif",
+      "gif": "https://i.imgur.com/example-legout.gif",
+      "instructions": [
+        "Squat classique",
+        "En remontant, étendez une jambe",
+        "Alternez les jambes",
+        "Équilibre requis"
+      ]
+    },
+    {
+      "id": 34,
+      "name": "Pompes avec élévation de jambe",
+      "description": "Push-ups avec élévation alternée des jambes.",
+      "muscles": ["Pectoraux", "Fessiers", "Abdominaux"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-pushupleg.gif",
+      "gif": "https://i.imgur.com/example-pushupleg.gif",
+      "instructions": [
+        "Push-up classique",
+        "Levez une jambe",
+        "Maintenez pendant le mouvement",
+        "Alternez les jambes"
+      ]
+    },
+    {
+      "id": 35,
+      "name": "Gainage avec mouvement de jambe",
+      "description": "Planche avec mouvement alterné des jambes vers l'extérieur.",
+      "muscles": ["Abdominaux", "Fessiers", "Épaules"],
+      "level": "intermediate",
+      "equipment": "none",
+      "video": "https://i.imgur.com/example-planklegout.gif",
+      "gif": "https://i.imgur.com/example-planklegout.gif",
+      "instructions": [
+        "Position de planche",
+        "Levez une jambe sur le côté",
+        "Retournez en planche",
+        "Alternez les jambes"
+      ]
+    },
+    {
+      "id": 36,
+      "name": "Marche rapide",
+      "description": "Marche active pour stimuler le système cardiovasculaire en douceur.",
+      "muscles": ["Cardio", "Jambes"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBrM215OG9pc3QwNWY0M3l3Y3RnY2sxbXZtbGk5Z2VheDQ4djBtYiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uVInGUM8IIZ4hjR3O1/giphy.gif",
+      "gif": "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExNTBrM215OG9pc3QwNWY0M3l3Y3RnY2sxbXZtbGk5Z2VheDQ4djBtYiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uVInGUM8IIZ4hjR3O1/giphy.gif",
+      "instructions": [
+        "Tenez-vous droit avec les épaules relâchées",
+        "Marchez à un rythme soutenu en balançant les bras",
+        "Gardez la foulée active et régulière",
+        "Respirez profondément et maintenez le tempo"
+      ]
+    },
+    {
+      "id": 37,
+      "name": "Renforcement musculaire du tronc",
+      "description": "Séquence ciblée pour renforcer les muscles profonds du tronc et stabiliser la colonne.",
+      "muscles": ["Abdominaux", "Bas du dos", "Gainage"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnJpeTg2Z2Y4NDV2N2dzbjB2Mzg0aG1iODJhNWY4eWwxdGY3eGJrayZlcD12MV9naWZzX3NlYXJjaCZjdD1n/zaR7tiEqKqdwY/giphy.gif",
+      "gif": "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnJpeTg2Z2Y4NDV2N2dzbjB2Mzg0aG1iODJhNWY4eWwxdGY3eGJrayZlcD12MV9naWZzX3NlYXJjaCZjdD1n/zaR7tiEqKqdwY/giphy.gif",
+      "instructions": [
+        "Allongez-vous sur le dos, genoux fléchis",
+        "Engagez les abdos en relevant légèrement la tête et les épaules",
+        "Contractez le bas du dos contre le tapis",
+        "Maintenez 20 secondes, relâchez et répétez"
+      ]
+    },
+    {
+      "id": 38,
+      "name": "Yoga doux",
+      "description": "Enchaînement de postures de yoga lentes pour gagner en flexibilité et détente.",
+      "muscles": ["Flexibilité", "Relaxation"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExdXBmajJnb3pjdWhjZGw4bDI3cHB4bGRpMHhmbmQ1cTM5cmVqM2xxbSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1WVJ8Hd4xABhu/giphy.gif",
+      "gif": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExdXBmajJnb3pjdWhjZGw4bDI3cHB4bGRpMHhmbmQ1cTM5cmVqM2xxbSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/1WVJ8Hd4xABhu/giphy.gif",
+      "instructions": [
+        "Placez-vous sur un tapis dans une posture confortable",
+        "Enchaînez des mouvements lents en synchronisant respiration et gestes",
+        "Allongez la colonne vertébrale et ouvrez la cage thoracique",
+        "Terminez par une phase de relaxation profonde"
+      ]
+    },
+    {
+      "id": 39,
+      "name": "Renforcement des abdominaux (planche)",
+      "description": "Planche dynamique pour renforcer la sangle abdominale et stabiliser le tronc.",
+      "muscles": ["Abdominaux", "Gainage"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMTdnNXd1ODFxY2FkODJjYW4zN3hiODJ3dXhuNWJiOG5pZ3hkbDdvcyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ZcteOOkovIh9HaVFjT/giphy.gif",
+      "gif": "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMTdnNXd1ODFxY2FkODJjYW4zN3hiODJ3dXhuNWJiOG5pZ3hkbDdvcyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/ZcteOOkovIh9HaVFjT/giphy.gif",
+      "instructions": [
+        "Placez-vous en planche sur les avant-bras, corps aligné",
+        "Contractez les abdos et maintenez les hanches stables",
+        "Respirez calmement pendant toute la durée de l’exercice",
+        "Relâchez après 20 à 30 secondes et répétez"
+      ]
+    },
+    {
+      "id": 40,
+      "name": "Flexions sur les genoux (squat léger)",
+      "description": "Squats légers axés sur la mobilité des genoux et le renforcement des jambes.",
+      "muscles": ["Quadriceps", "Fessiers"],
+      "level": "beginner",
+      "equipment": "none",
+      "video": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWw1czVubXE5cTcxNWZ0ZHhqcnhqN21yMHY5MXZtc2U3MzN0ZzF1YyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tHyPJtOwPChKmF0LKg/giphy.gif",
+      "gif": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWw1czVubXE5cTcxNWZ0ZHhqcnhqN21yMHY5MXZtc2U3MzN0ZzF1YyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/tHyPJtOwPChKmF0LKg/giphy.gif",
+      "instructions": [
+        "Tenez-vous debout, pieds à la largeur des épaules",
+        "Pliez les genoux en poussant les hanches vers l’arrière",
+        "Gardez le dos droit et les talons ancrés au sol",
+        "Remontez en contractant les cuisses et les fessiers"
+      ]
+    },
+    {
+      "id": 41,
+      "name": "Étirements du dos",
+      "description": "Étirement doux pour relâcher les tensions dans le bas du dos.",
+      "muscles": ["Dos", "Flexibilité"],
+      "level": "beginner",
+      "equipment": "mat",
+      "video": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZDB5MHl6bHlxdWp3eDk2aDk1dWo5cWJlMXhqZzNxMGI0YzFlYWZwbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Nz5IpoT3Pz5BVOlt1m/giphy.gif",
+      "gif": "https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExZDB5MHl6bHlxdWp3eDk2aDk1dWo5cWJlMXhqZzNxMGI0YzFlYWZwbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/Nz5IpoT3Pz5BVOlt1m/giphy.gif",
+      "instructions": [
+        "Asseyez-vous sur les talons, bras tendus devant vous",
+        "Allongez la colonne en posant le front sur le tapis",
+        "Respirez profondément et relâchez les épaules",
+        "Maintenez 30 à 60 secondes puis redressez-vous doucement"
+      ]
+    }
+  ]
+}

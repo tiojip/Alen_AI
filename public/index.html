@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSP très permissive pour le développement - désactivée temporairement pour debug -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'inline-speculation-rules'; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src * ws: wss:; frame-src *; object-src *;"> -->
+    <title>Alen</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='48'%3E%F0%9F%8F%8B%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <!-- Page de connexion (affichée seule avant authentification) -->
+    <div id="login-page" class="login-page" style="display: flex;">
+        <div class="auth-container">
+            <h2>Bienvenue</h2>
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="login">Connexion</button>
+                <button class="tab-btn" data-tab="register">Inscription</button>
+            </div>
+            
+            <form id="login-form" class="auth-form">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Mot de passe" required>
+                <button type="submit">Se connecter</button>
+            </form>
+
+            <div class="auth-links">
+                <button type="button" id="link-forgot-password">Mot de passe oublié ?</button>
+            </div>
+
+            <form id="register-form" class="auth-form hidden">
+                <input type="text" id="register-name" placeholder="Nom (optionnel)">
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Mot de passe" required>
+                <button type="submit">S'inscrire</button>
+            </form>
+
+            <div id="auth-error" class="error-message"></div>
+        </div>
+    </div>
+
+    <div id="password-reset-modal" class="modal">
+        <div class="modal-content modal-small">
+            <span class="close-modal" id="password-reset-close">&times;</span>
+            <h2>Réinitialiser mon mot de passe</h2>
+            <p class="modal-intro">Entrez votre adresse email pour recevoir un code de réinitialisation. Il sera valable pendant 1 heure.</p>
+            <div id="password-reset-feedback" class="form-feedback"></div>
+
+            <div id="password-reset-request" class="password-reset-section">
+                <form id="password-reset-request-form">
+                    <label for="password-reset-email">Adresse email</label>
+                    <input type="email" id="password-reset-email" placeholder="exemple@domaine.com" required>
+                    <button type="submit" class="btn-primary full-width">Recevoir un code</button>
+                </form>
+                <p class="modal-hint">Nous affichons également le code dans la console (mode développement) pour faciliter les tests.</p>
+            </div>
+
+            <div id="password-reset-confirm" class="password-reset-section">
+                <hr class="modal-separator">
+                <p class="modal-intro">Renseignez le code reçu puis choisissez un nouveau mot de passe.</p>
+                <form id="password-reset-confirm-form">
+                    <label for="password-reset-token">Code de réinitialisation</label>
+                    <input type="text" id="password-reset-token" placeholder="Code reçu" required>
+
+                    <label for="password-reset-new-password">Nouveau mot de passe</label>
+                    <input type="password" id="password-reset-new-password" placeholder="Nouveau mot de passe" required>
+
+                    <label for="password-reset-confirm-password">Confirmer le mot de passe</label>
+                    <input type="password" id="password-reset-confirm-password" placeholder="Confirmer le mot de passe" required>
+
+                    <button type="submit" class="btn-primary full-width">Mettre à jour mon mot de passe</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application (affichée après authentification) -->
+    <div id="app-container" class="app-container hidden">
+        <!-- Navigation -->
+        <nav id="navbar">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <h1>🏋️ Alen</h1>
+                    <button class="nav-toggle" type="button" aria-label="Afficher le menu">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                </div>
+                <div class="nav-links">
+                    <button id="nav-dashboard" class="nav-btn active">Dashboard</button>
+                    <button id="nav-workout" class="nav-btn">Entraînement</button>
+                    <button id="nav-progress" class="nav-btn">Progression</button>
+                    <button id="nav-chat" class="nav-btn">Chat Coach</button>
+                    <button id="nav-exercises" class="nav-btn" data-page="exercises-catalog">Exercices</button>
+                    <button id="nav-profile" class="nav-btn">Profil</button>
+                    <button id="nav-logout" class="nav-btn">Déconnexion</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Modal de consentement conforme Loi 25 (FR-02) -->
+        <div id="consent-modal" class="modal">
+        <div class="modal-content">
+            <h2>Consentement et Protection des Renseignements Personnels</h2>
+            <div class="consent-text">
+                <p><strong>Conformité à la Loi 25 (Québec)</strong></p>
+                <p>Conformément à la <em>Loi sur la protection des renseignements personnels dans le secteur privé</em> (Loi 25), nous vous informons de la collecte et de l'utilisation de vos renseignements personnels.</p>
+                
+                <p><strong>1. Responsable du traitement</strong></p>
+                <p>Les renseignements personnels sont collectés et traités par cette application de coaching virtuel intelligent.</p>
+                
+                <p><strong>2. Renseignements collectés</strong></p>
+                <ul>
+                    <li><strong>Renseignements d'identification :</strong> nom, adresse courriel</li>
+                    <li><strong>Renseignements de santé :</strong> âge, poids, taille, niveau de forme physique</li>
+                    <li><strong>Données d'entraînement :</strong> séances complétées, progression, scores posturaux</li>
+                    <li><strong>Données biométriques :</strong> analyse posturale via caméra (traitement local uniquement)</li>
+                    <li><strong>Préférences :</strong> objectifs, contraintes physiques, paramètres d'application</li>
+                </ul>
+                
+                <p><strong>3. Finalités de la collecte</strong></p>
+                <ul>
+                    <li>Génération et personnalisation de plans d'entraînement</li>
+                    <li>Analyse posturale en temps réel pour la sécurité</li>
+                    <li>Suivi de progression et optimisation continue</li>
+                    <li>Amélioration de l'expérience utilisateur</li>
+                </ul>
+                
+                <p><strong>4. Mesures de sécurité</strong></p>
+                <ul>
+                    <li>Chiffrement AES-256 des données sensibles avant synchronisation</li>
+                    <li>Traitement local des données biométriques (caméra)</li>
+                    <li>Stockage sécurisé avec accès authentifié</li>
+                    <li>Conformité aux normes de sécurité de la Loi 25</li>
+                </ul>
+                
+                <p><strong>5. Conservation et destruction</strong></p>
+                <p>Vos données sont conservées tant que votre compte est actif. Vous pouvez demander leur suppression à tout moment via votre profil.</p>
+                
+                <p><strong>6. Vos droits (Loi 25)</strong></p>
+                <ul>
+                    <li>Droit d'accès à vos renseignements personnels</li>
+                    <li>Droit de rectification des données inexactes</li>
+                    <li>Droit de retrait du consentement</li>
+                    <li>Droit de porter plainte auprès de la Commission d'accès à l'information du Québec</li>
+                </ul>
+                
+                <p><strong>7. Partage des données</strong></p>
+                <p>Vos renseignements personnels ne sont <strong>jamais</strong> partagés avec des tiers sans votre consentement explicite, sauf obligation légale.</p>
+                
+                <div class="consent-checkbox-container">
+                    <label>
+                        <input type="checkbox" id="consent-checkbox" required>
+                        <span>J'ai lu et compris les informations ci-dessus. Je consens au traitement de mes renseignements personnels et de santé selon les conditions décrites, conformément à la Loi 25.</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="consent-accept" class="btn-primary" disabled>J'accepte et continue</button>
+                <button id="consent-decline" class="btn-secondary">Refuser</button>
+            </div>
+            <div class="consent-footer">
+                <p><small>Pour toute question concernant vos renseignements personnels, contactez-nous via votre profil.</small></p>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Dashboard -->
+        <div id="dashboard-page" class="page">
+        <div class="container">
+            <h2 class="sr-only">Tableau de bord</h2>
+
+            <div class="dashboard-hero card">
+                <div class="dashboard-hero-left">
+                    <p class="hero-greeting">Bonjour <span id="dashboard-username">Athlète</span> 👋</p>
+                    <h3 id="dashboard-hero-headline">Prêt pour ta prochaine séance ?</h3>
+                    <p id="dashboard-hero-message">Tu n'as pas encore lancé de séance aujourd'hui. Choisis-en une pour garder le rythme 💪</p>
+                    <div class="hero-actions">
+                        <button id="btn-start-workout" class="btn-primary">Commencer une séance</button>
+                        <button id="btn-view-plan" class="btn-secondary">Voir le plan</button>
+                    </div>
+                </div>
+                <div class="dashboard-hero-stats">
+                    <div class="hero-stat">
+                        <span class="hero-stat-label">Séances complétées</span>
+                        <span class="hero-stat-value" id="dashboard-hero-sessions">0</span>
+                    </div>
+                    <div class="hero-stat">
+                        <span class="hero-stat-label">Dernière séance</span>
+                        <span class="hero-stat-value" id="dashboard-hero-last">-</span>
+                    </div>
+                    <div class="hero-stat">
+                        <span class="hero-stat-label">Plan actif</span>
+                        <span class="hero-stat-value" id="dashboard-hero-plan">Aucun</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-grid">
+                <div class="card plan-card">
+                    <div class="card-header">
+                        <h3>Plan d'entraînement</h3>
+                        <button id="btn-generate-plan" class="btn-secondary subtle">Regénérer</button>
+                    </div>
+                    <div id="workout-plan-preview" class="plan-preview"></div>
+                    <div id="dashboard-plan-days" class="plan-days"></div>
+                </div>
+
+                <div class="card progress-card">
+                    <div class="card-header">
+                        <h3>Progression rapide</h3>
+                        <button id="btn-go-progress" class="btn-link">Voir plus</button>
+                    </div>
+                    <div id="dashboard-progress-summary" class="progress-summary">
+                        <div class="progress-pill">
+                            <span class="progress-label">Score postural moyen</span>
+                            <span class="progress-value" id="dashboard-progress-score">--</span>
+                        </div>
+                        <div class="progress-pill">
+                            <span class="progress-label">Volume total</span>
+                            <span class="progress-value" id="dashboard-progress-volume">--</span>
+                        </div>
+                        <div class="progress-pill">
+                            <span class="progress-label">Fréquence</span>
+                            <span class="progress-value" id="dashboard-progress-frequency">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card quick-actions-card">
+                    <h3>Actions rapides</h3>
+                    <div class="quick-actions-grid">
+                        <button id="btn-evaluate-posture" class="quick-action">
+                            <span>Évaluation posturale</span>
+                            <small>Affiner l'ajustement du plan</small>
+                        </button>
+                        <button id="btn-open-catalog" class="quick-action">
+                            <span>Explorer le catalogue</span>
+                            <small>Nouveaux exercices &amp; inspirations</small>
+                        </button>
+                        <button id="btn-open-chat" class="quick-action">
+                            <span>Parler à Alen</span>
+                            <small>Conseils en temps réel</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Profil -->
+        <div id="profile-page" class="page">
+        <div class="container">
+            <h2>Mon Profil</h2>
+            
+            <div class="card">
+                <h3>Informations personnelles</h3>
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label>Nom</label>
+                        <input type="text" id="profile-name">
+                    </div>
+                    <div class="form-group">
+                        <label>Âge</label>
+                        <input type="number" id="profile-age" min="1" max="120">
+                    </div>
+                    <div class="form-group">
+                        <label>Poids (kg)</label>
+                        <input type="number" id="profile-weight" step="0.1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Taille (cm)</label>
+                        <input type="number" id="profile-height" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Niveau de forme</label>
+                        <select id="profile-level">
+                            <option value="beginner">Débutant</option>
+                            <option value="intermediate">Intermédiaire</option>
+                            <option value="advanced">Avancé</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Objectifs</label>
+                        <textarea id="profile-goals" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraintes physiques</label>
+                        <textarea id="profile-constraints" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Préférences</h3>
+                <form id="preferences-form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="pref-dark-mode"> Mode sombre
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="pref-sounds" checked> Sons
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <div>
+                                <label>
+                                    <input type="checkbox" id="pref-notifications" checked> Notifications
+                                </label>
+                                <div id="notification-settings" style="margin-top: 1rem; margin-left: 1.5rem; padding: 1rem; background: var(--bg-color); border-radius: 4px;">
+                                    <div class="form-group">
+                                        <label for="pref-notification-time">Heure de rappel:</label>
+                                        <input type="time" id="pref-notification-time" value="18:00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Jours de la semaine:</label>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="1" checked> Lun
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="2" checked> Mar
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="3" checked> Mer
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="4" checked> Jeu
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="5" checked> Ven
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="6" checked> Sam
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <input type="checkbox" class="notification-day" value="0" checked> Dim
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Unités de poids</label>
+                        <select id="pref-weight-unit">
+                            <option value="kg">Kilogrammes (kg)</option>
+                            <option value="lb">Livres (lb)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Unités de taille</label>
+                        <select id="pref-height-unit">
+                            <option value="cm">Centimètres (cm)</option>
+                            <option value="ft">Pieds/Pouces (ft/in)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Langue</label>
+                        <select id="pref-language">
+                            <option value="fr">Français</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Profil détaillé</h3>
+                <p>Complétez votre profil pour une personnalisation optimale de votre plan d'entraînement.</p>
+                
+                <div class="profile-tabs">
+                    <button class="profile-tab-btn active" data-tab="physical">Données physiques</button>
+                    <button class="profile-tab-btn" data-tab="lifestyle">Habitudes de vie</button>
+                    <button class="profile-tab-btn" data-tab="motivation">Motivation</button>
+                    <button class="profile-tab-btn" data-tab="history">Historique</button>
+                    <button class="profile-tab-btn" data-tab="technical">Préférences techniques</button>
+                </div>
+                
+                <form id="extended-profile-form">
+                    <!-- Section Données physiques -->
+                    <div id="profile-section-physical" class="profile-tab-section active">
+                        <h4>Données physiques et biométriques</h4>
+                        <div class="form-group">
+                            <label>Fréquence cardiaque de repos (bpm)</label>
+                            <input type="number" id="profile-resting-hr" min="40" max="120">
+                        </div>
+                        <div class="form-group">
+                            <label>Tension artérielle moyenne (ex: 120/80)</label>
+                            <input type="text" id="profile-blood-pressure" placeholder="120/80">
+                        </div>
+                        <div class="form-group">
+                            <label>IMC</label>
+                            <input type="number" id="profile-bmi" step="0.1" min="10" max="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Composition corporelle (%)</label>
+                            <input type="text" id="profile-body-comp" placeholder="Ex: 15% graisse, 45% muscle">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tour de taille (cm)</label>
+                                <input type="number" id="profile-waist" step="0.1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Tour de hanches (cm)</label>
+                                <input type="number" id="profile-hip" step="0.1" min="1">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tour de bras (cm)</label>
+                                <input type="number" id="profile-arm" step="0.1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Tour de cuisses (cm)</label>
+                                <input type="number" id="profile-thigh" step="0.1" min="1">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Antécédents médicaux</label>
+                            <textarea id="profile-medical-history" rows="3" placeholder="Listez vos antécédents médicaux..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Historique de blessures</label>
+                            <textarea id="profile-injury-history" rows="3" placeholder="Décrivez vos blessures passées..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Qualité du sommeil moyenne (1-10)</label>
+                            <input type="range" id="profile-sleep-quality" min="1" max="10" value="5">
+                            <span id="sleep-quality-value">5</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Niveau de fatigue général (1-10)</label>
+                            <input type="range" id="profile-fatigue" min="1" max="10" value="5">
+                            <span id="fatigue-value">5</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Habitudes de vie -->
+                    <div id="profile-section-lifestyle" class="profile-tab-section">
+                        <h4>Habitudes de vie et environnement</h4>
+                        <div class="form-group">
+                            <label>Disponibilités hebdomadaires</label>
+                            <textarea id="profile-availability" rows="3" placeholder="Ex: Lundi 18h-20h, Mercredi 19h-21h, Samedi 10h-12h"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Durée moyenne souhaitée des séances (minutes)</label>
+                            <select id="profile-session-duration">
+                                <option value="15">15 minutes</option>
+                                <option value="20">20 minutes</option>
+                                <option value="30" selected>30 minutes</option>
+                                <option value="45">45 minutes</option>
+                                <option value="60">60 minutes</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Lieu d'entraînement principal</label>
+                            <select id="profile-location">
+                                <option value="home">Domicile</option>
+                                <option value="gym">Salle de sport</option>
+                                <option value="outdoor">Extérieur</option>
+                                <option value="mixed">Mixte</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Équipement disponible</label>
+                            <textarea id="profile-equipment" rows="3" placeholder="Ex: Tapis, haltères, bandes élastiques, aucun..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Temps passé assis par jour (heures)</label>
+                            <input type="number" id="profile-sitting-hours" step="0.5" min="0" max="24" value="8">
+                        </div>
+                        <div class="form-group">
+                            <label>Type de régime alimentaire</label>
+                            <select id="profile-diet">
+                                <option value="omnivore">Omnivore</option>
+                                <option value="vegetarian">Végétarien</option>
+                                <option value="vegan">Végétalien</option>
+                                <option value="pescatarian">Pescétarien</option>
+                                <option value="keto">Cétogène</option>
+                                <option value="other">Autre</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Motivation -->
+                    <div id="profile-section-motivation" class="profile-tab-section">
+                        <h4>Motivation et psychologie</h4>
+                        <div class="form-group">
+                            <label>Motivation principale</label>
+                            <select id="profile-motivation">
+                                <option value="health">Santé</option>
+                                <option value="performance">Performance</option>
+                                <option value="aesthetics">Esthétique</option>
+                                <option value="mental_wellbeing">Bien-être mental</option>
+                                <option value="mixed">Mixte</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Style d'accompagnement préféré</label>
+                            <select id="profile-coaching-style">
+                                <option value="encouraging">Encourageant</option>
+                                <option value="competitive">Compétitif</option>
+                                <option value="calm">Calme</option>
+                                <option value="scientific">Scientifique</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Facteurs de démotivation fréquents</label>
+                            <textarea id="profile-demotivation" rows="3" placeholder="Ex: Fatigue, ennui, manque de temps, douleur..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Score d'engagement initial (1-5)</label>
+                            <input type="range" id="profile-engagement" min="1" max="5" value="3">
+                            <span id="engagement-value">3</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Préférences sociales</label>
+                            <select id="profile-social">
+                                <option value="alone">Seul</option>
+                                <option value="virtual_group">En groupe virtuel</option>
+                                <option value="with_friend">Avec un ami</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Historique -->
+                    <div id="profile-section-history" class="profile-tab-section">
+                        <h4>Historique et expérience sportive</h4>
+                        <div class="form-group">
+                            <label>Disciplines déjà pratiquées</label>
+                            <textarea id="profile-past-sports" rows="3" placeholder="Ex: Course à pied, musculation, yoga..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Fréquence moyenne d'entraînement passée</label>
+                            <select id="profile-past-frequency">
+                                <option value="never">Jamais</option>
+                                <option value="rarely">Rarement (1x/mois)</option>
+                                <option value="occasionally">Occasionnellement (2-3x/mois)</option>
+                                <option value="regularly">Régulièrement (1-2x/semaine)</option>
+                                <option value="frequently">Fréquemment (3-5x/semaine)</option>
+                                <option value="daily">Quotidiennement</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Durée depuis la dernière pratique régulière</label>
+                            <select id="profile-time-since">
+                                <option value="active">Actif actuellement</option>
+                                <option value="1month">1 mois</option>
+                                <option value="3months">3 mois</option>
+                                <option value="6months">6 mois</option>
+                                <option value="1year">1 an</option>
+                                <option value="2years">2 ans</option>
+                                <option value="more">Plus de 2 ans</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Évaluation subjective de la technique</label>
+                            <textarea id="profile-technique" rows="3" placeholder="Ex: Débutant en musculation, intermédiaire en cardio, avancé en yoga..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Section Techniques -->
+                    <div id="profile-section-technical" class="profile-tab-section">
+                        <h4>Composantes techniques et IA</h4>
+                        <div class="form-group">
+                            <label>Objectifs temporels mesurables</label>
+                            <textarea id="profile-measurable-goals" rows="3" placeholder="Ex: Perdre 5 kg en 2 mois, faire 20 pompes, courir 5 km en 25 min..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Sensibilité aux alertes ou feedbacks (1-10)</label>
+                            <input type="range" id="profile-alert-sensitivity" min="1" max="10" value="5">
+                            <span id="alert-sensitivity-value">5</span>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="profile-camera-consent" checked>
+                                Autoriser l'utilisation de la caméra pour ajustement postural
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Préférence de planification</label>
+                            <select id="profile-planning-pref">
+                                <option value="auto">Automatique par IA</option>
+                                <option value="semi_auto">Semi-automatique</option>
+                                <option value="manual">Manuel</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Enregistrer le profil détaillé</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Gestion des données personnelles (Loi 25)</h3>
+                <p>Conformément à la Loi 25, vous avez le droit de :</p>
+                <div class="data-rights-actions">
+                    <button id="btn-access-data" class="btn-secondary">Accéder à mes données</button>
+                    <button id="btn-withdraw-consent" class="btn-secondary">Retirer mon consentement</button>
+                    <button id="btn-delete-account" class="btn-danger">Supprimer mon compte</button>
+                </div>
+                <div id="consent-info" class="consent-info"></div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Entraînement -->
+        <div id="workout-page" class="page">
+        <div class="container">
+            <h2>Entraînement</h2>
+            
+            <div id="workout-selection" class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">Sélectionner une séance</h3>
+                    <button id="btn-edit-plan" class="btn-secondary" style="display: none;">Modifier le plan</button>
+                </div>
+                <div id="workout-days"></div>
+            </div>
+
+            <div id="workout-active" class="card hidden">
+                <h3 id="current-exercise-name"></h3>
+                
+                <!-- Indicateurs de progression (FR-09) -->
+                <div class="workout-progress-indicators">
+                    <div class="progress-indicator">
+                        <span class="indicator-label">Exercice</span>
+                        <span id="exercise-counter" class="indicator-value">1/1</span>
+                    </div>
+                    <div class="progress-indicator">
+                        <span class="indicator-label">Série</span>
+                        <span id="set-counter" class="indicator-value">1/1</span>
+                    </div>
+                    <div class="progress-indicator">
+                        <span class="indicator-label">Répétitions</span>
+                        <span id="rep-counter" class="indicator-value">0/0</span>
+                    </div>
+                </div>
+                
+                <div class="workout-video-container">
+                    <video id="workout-video" autoplay playsinline></video>
+                    <canvas id="workout-canvas"></canvas>
+                    <div id="workout-exercise-gif" class="workout-exercise-gif"></div>
+                </div>
+                
+                <!-- Compte à rebours pour repos (FR-09) -->
+                <div id="rest-countdown" class="rest-countdown hidden">
+                    <div class="countdown-overlay">
+                        <h2>Repos</h2>
+                        <div id="countdown-display" class="countdown-display">00</div>
+                        <p>Prochain exercice dans...</p>
+                    </div>
+                </div>
+                
+                <div id="workout-feedback" class="feedback-box"></div>
+                
+                <!-- Indicateur de score postural en temps réel (FR-10) -->
+                <div id="posture-score-indicator" class="posture-score-indicator hidden">
+                    <span class="posture-score-label">Score postural:</span>
+                    <span id="posture-score-value" class="posture-score-value">--</span>
+                </div>
+                
+                <!-- Barre de progression de l'exercice (FR-09) -->
+                <div class="exercise-progress-bar">
+                    <div id="exercise-progress-fill" class="exercise-progress-fill"></div>
+                </div>
+                
+                <div class="workout-controls">
+                    <button id="btn-pause" class="btn-secondary">Pause</button>
+                    <button id="btn-prev" class="btn-secondary">Précédent</button>
+                    <button id="btn-skip" class="btn-primary">Passer</button>
+                    <button id="btn-stop" class="btn-danger">Arrêter</button>
+                    <button id="btn-save-workout" class="btn-primary">Enregistrer</button>
+                </div>
+                <div class="workout-timer">
+                    <span id="timer-display">00:00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Évaluation posturale (FR-05) -->
+        <div id="posture-eval-page" class="page">
+        <div class="container">
+            <h2>Évaluation posturale initiale</h2>
+            <div class="card">
+                <p>Effectuez quelques mouvements de base pour que le système évalue votre niveau et votre posture.</p>
+                <div id="eval-progress">
+                    <div class="progress-bar">
+                        <div id="eval-progress-fill" class="progress-fill"></div>
+                    </div>
+                    <p id="eval-status">Prêt à commencer</p>
+                </div>
+                <div class="video-container">
+                    <video id="eval-video" autoplay playsinline></video>
+                    <canvas id="eval-canvas"></canvas>
+                </div>
+                <div id="eval-instructions" class="eval-instructions"></div>
+                <div id="eval-feedback" class="feedback-box"></div>
+                <div id="eval-scores" class="eval-scores hidden"></div>
+                <div class="eval-controls">
+                    <button id="btn-start-eval" class="btn-primary">Commencer l'évaluation</button>
+                    <button id="btn-next-exercise" class="btn-primary hidden">Exercice suivant</button>
+                    <button id="btn-finish-eval" class="btn-primary hidden">Terminer</button>
+                    <button id="btn-cancel-eval" class="btn-secondary hidden">Annuler</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Catalogue d'exercices (FR-08) -->
+        <div id="exercises-catalog-page" class="page">
+        <div class="container">
+            <h2>Catalogue d'exercices</h2>
+            <div class="card">
+                <div class="catalog-filters">
+                    <select id="filter-level">
+                        <option value="">Tous les niveaux</option>
+                        <option value="beginner">Débutant</option>
+                        <option value="intermediate">Intermédiaire</option>
+                        <option value="advanced">Avancé</option>
+                    </select>
+                    <select id="filter-equipment">
+                        <option value="">Tout matériel</option>
+                        <option value="none">Sans matériel</option>
+                        <option value="chair">Chaise</option>
+                        <option value="mat">Tapis</option>
+                    </select>
+                    <input type="text" id="filter-search" placeholder="Rechercher un exercice...">
+                </div>
+                <div id="exercises-list" class="exercises-grid"></div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Modal détail exercice -->
+        <div id="exercise-detail-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="exercise-detail-content"></div>
+        </div>
+    </div>
+
+        <!-- Modal édition plan (FR-07) -->
+        <div id="edit-plan-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal">&times;</span>
+            <h2>Modifier le plan d'entraînement</h2>
+            <div id="edit-plan-content">
+                <div id="edit-plan-loading" style="text-align: center; padding: 2rem;">
+                    <p>Chargement...</p>
+                </div>
+                <div id="edit-plan-form" style="display: none;">
+                    <div id="edit-plan-days"></div>
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid var(--border-color);">
+                        <div style="display: flex; gap: 1rem; justify-content: space-between;">
+                            <button id="btn-cancel-edit" class="btn-secondary">Annuler</button>
+                            <div style="display: flex; gap: 1rem;">
+                                <button id="btn-view-history" class="btn-secondary">Historique</button>
+                                <button id="btn-save-plan" class="btn-primary">Enregistrer les modifications</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Modal historique versions (FR-07) -->
+        <div id="plan-history-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal">&times;</span>
+            <h2>Historique des versions</h2>
+            <div id="plan-history-content">
+                <div id="plan-history-list"></div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Modal bilan post-séance (FR-11) -->
+        <div id="post-session-modal" class="modal">
+        <div class="modal-content">
+            <h2>Bilan de votre séance</h2>
+            <div id="post-session-content">
+                <div class="session-summary">
+                    <h3>Résumé</h3>
+                    <div id="session-stats"></div>
+                </div>
+                <div class="session-feedback">
+                    <h3>Comment vous êtes-vous senti ?</h3>
+                    <div class="feeling-input-group">
+                        <div class="feeling-icon">😊</div>
+                        <textarea id="session-feeling" rows="3" placeholder="Décrivez votre ressenti, votre humeur, votre énergie..."></textarea>
+                    </div>
+                    <p class="feeling-helper">
+                        Partagez vos sensations physiques et mentales : fatigue, énergie, motivation, douleurs éventuelles, etc.
+                    </p>
+                    <div class="feeling-scale">
+                        <label>Niveau de difficulté (1-5):</label>
+                        <input type="range" id="difficulty-level" min="1" max="5" value="3">
+                        <span id="difficulty-text">Moyen</span>
+                    </div>
+                    <div class="feeling-scale">
+                        <label>RPE - Échelle d'effort perçu (1-10):</label>
+                        <input type="range" id="rpe-level" min="1" max="10" value="5">
+                        <span id="rpe-text">5 - Dur</span>
+                    </div>
+                </div>
+                <div id="ai-advice" class="ai-advice">
+                    <h3>Conseils personnalisés</h3>
+                    <div id="ai-advice-content"></div>
+                </div>
+                <button id="btn-save-session" class="btn-primary">Enregistrer et continuer</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Progression -->
+        <div id="progress-page" class="page">
+        <div class="container">
+            <h2>Progression</h2>
+
+            <div class="progress-hero card">
+                <div class="hero-info">
+                    <span class="hero-badge">Résumé intelligent</span>
+                    <h3>Vue d'ensemble</h3>
+                    <p id="progress-period-label">Synthèse des 30 derniers jours</p>
+                    <div class="hero-metrics">
+                        <div class="hero-metric">
+                            <span class="hero-metric-label">Score moyen</span>
+                            <span id="hero-score" class="hero-metric-value">--</span>
+                        </div>
+                        <div class="hero-metric">
+                            <span class="hero-metric-label">Volume total</span>
+                            <span id="hero-volume" class="hero-metric-value">--</span>
+                        </div>
+                        <div class="hero-metric">
+                            <span class="hero-metric-label">Fréquence</span>
+                            <span id="hero-frequency" class="hero-metric-value">--</span>
+                        </div>
+                        <div class="hero-metric">
+                            <span class="hero-metric-label">Cohérence</span>
+                            <span id="hero-consistency" class="hero-metric-value">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-controls">
+                    <span class="controls-label">Période</span>
+                    <div class="period-chip-group" id="period-chip-group">
+                        <button class="period-chip" data-period="7">7j</button>
+                        <button class="period-chip active" data-period="30">30j</button>
+                        <button class="period-chip" data-period="90">3 mois</button>
+                        <button class="period-chip" data-period="180">6 mois</button>
+                        <button class="period-chip" data-period="365">1 an</button>
+                        <button class="period-chip" data-period="all">Tout</button>
+                    </div>
+                    <select id="period-filter" class="period-select sr-only" aria-label="Filtrer par période">
+                        <option value="7">7 derniers jours</option>
+                        <option value="30" selected>30 derniers jours</option>
+                        <option value="90">3 derniers mois</option>
+                        <option value="180">6 derniers mois</option>
+                        <option value="365">1 an</option>
+                        <option value="all">Tout</option>
+                    </select>
+                    <div class="hero-badges">
+                        <span id="hero-sessions" class="hero-pill">0 séance analysée</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress-main-grid">
+                <div class="card sessions-card">
+                    <h3>Historique des séances</h3>
+                    <div id="sessions-list"></div>
+                </div>
+                <div class="card stats-card">
+                    <h3>Statistiques détaillées</h3>
+                    <div class="chart-container">
+                        <canvas id="progress-chart"></canvas>
+                    </div>
+                    <div id="progress-metrics" class="progress-metrics"></div>
+                </div>
+            </div>
+            
+            <div class="progress-secondary-grid">
+                <div class="card">
+                    <h3>Volume d'entraînement</h3>
+                    <div class="chart-container">
+                        <canvas id="volume-chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Fréquence et cohérence</h3>
+                    <div class="chart-container">
+                        <canvas id="frequency-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Page Chat -->
+        <div id="chat-page" class="page">
+            <div class="container">
+                <h2>Chat avec votre coach</h2>
+                <div class="card chat-container">
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="Posez votre question...">
+                        <button id="btn-send-chat" class="btn-primary">Envoyer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- Fin de app-container -->
+
+    <style>
+        /* Style de secours pour garantir la visibilité */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .login-page {
+            display: flex !important;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        .app-container.hidden {
+            display: none !important;
+        }
+    </style>
+    <script>
+        // Script de débogage pour vérifier le chargement
+        console.log('Page HTML chargée');
+        console.log('CSS chargé:', document.styleSheets.length > 0);
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM chargé');
+            const loginPage = document.getElementById('login-page');
+            console.log('Login page trouvée:', !!loginPage);
+            if (loginPage) {
+                console.log('Classes login page:', loginPage.className);
+                console.log('Display computed:', window.getComputedStyle(loginPage).display);
+            }
+        });
+    </script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/consent.js"></script>
+    <script src="js/pose-detection.js"></script>
+    <script src="js/workout.js"></script>
+    <script src="js/exercises-catalog.js"></script>
+    <script src="js/post-session.js"></script>
+    <script src="js/progress-charts.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/profile-extended.js"></script>
+    <script src="js/plan-editor.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Vérification finale
+        console.log('Tous les scripts chargés');
+    </script>
+</body>
+</html>
+
+

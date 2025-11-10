@@ -1,0 +1,8 @@
+node_modules/
+coaching.db
+.DS_Store
+*.log
+.env
+.env.*
+*.env
+
