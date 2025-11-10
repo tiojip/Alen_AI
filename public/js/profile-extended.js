@@ -55,7 +55,8 @@ function populateExtendedProfileForm(profile) {
     if (profile.planning_preference) document.getElementById('profile-planning-pref').value = profile.planning_preference;
 }
 
-async function saveExtendedProfile() {
+async function saveExtendedProfile(options = {}) {
+    const { silent = false } = options;
     const profileData = {
         // Données physiques
         resting_heart_rate: parseInt(document.getElementById('profile-resting-hr').value) || null,
@@ -101,9 +102,16 @@ async function saveExtendedProfile() {
     
     try {
         await api.updateExtendedProfile(profileData);
-        alert('Profil étendu enregistré avec succès!');
+        if (!silent) {
+            alert('Profil étendu enregistré avec succès!');
+        }
+        return profileData;
     } catch (error) {
+        if (silent) {
+            throw error;
+        }
         alert('Erreur: ' + error.message);
+        return null;
     }
 }
 

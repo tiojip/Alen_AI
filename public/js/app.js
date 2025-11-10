@@ -685,36 +685,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loadExtendedProfile();
         }
     });
-    document.getElementById('profile-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-            await api.updateProfile({
-                name: document.getElementById('profile-name').value,
-                age: parseInt(document.getElementById('profile-age').value),
-                weight: parseFloat(document.getElementById('profile-weight').value),
-                height: parseInt(document.getElementById('profile-height').value),
-                fitness_level: document.getElementById('profile-level').value,
-                goals: document.getElementById('profile-goals').value,
-                constraints: document.getElementById('profile-constraints').value
-            });
-            
-            // Recharger le profil pour refléter les données sauvegardées et éviter la réinitialisation des champs
-            await loadProfile();
-            
-            // Vérifier si on doit passer à l'étape suivante du workflow (nouvel utilisateur)
-            if (typeof advanceWorkflow === 'function') {
-                // Attendre un peu pour que le profil soit bien sauvegardé
-                setTimeout(() => {
-                    advanceWorkflow();
-                }, 300);
-            } else {
-                alert('Profil mis à jour!');
-            }
-        } catch (error) {
-            alert('Erreur: ' + error.message);
-        }
-    });
-
     // Toggle des paramètres de notifications (FR-13)
     document.getElementById('pref-notifications')?.addEventListener('change', (e) => {
         const notificationSettings = document.getElementById('notification-settings');
@@ -723,48 +693,134 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('preferences-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
+    const collectProfileFormData = () => {
+        const parseIntOrNull = (value) => {
+            if (value === undefined || value === null || value === '') return null;
+            const parsed = parseInt(value, 10);
+            return Number.isNaN(parsed) ? null : parsed;
+        };
+        const parseFloatOrNull = (value) => {
+            if (value === undefined || value === null || value === '') return null;
+            const parsed = parseFloat(value);
+            return Number.isNaN(parsed) ? null : parsed;
+        };
+        const sanitizeText = (value) => {
+            if (value === undefined || value === null) return null;
+            const trimmed = value.trim();
+            return trimmed.length ? trimmed : null;
+        };
+
+        return {
+            name: sanitizeText(document.getElementById('profile-name').value),
+            age: parseIntOrNull(document.getElementById('profile-age').value),
+            weight: parseFloatOrNull(document.getElementById('profile-weight').value),
+            height: parseIntOrNull(document.getElementById('profile-height').value),
+            fitness_level: document.getElementById('profile-level').value,
+            goals: sanitizeText(document.getElementById('profile-goals').value),
+            constraints: sanitizeText(document.getElementById('profile-constraints').value)
+        };
+    };
+
+    const collectPreferencesFormData = () => {
+        const notificationsEnabled = document.getElementById('pref-notifications').checked;
+        const notificationDays = Array.from(document.querySelectorAll('.notification-day:checked'))
+            .map(cb => parseInt(cb.value, 10));
+        const notificationTime = document.getElementById('pref-notification-time').value;
+        const language = document.getElementById('pref-language').value;
+
+        return {
+            dark_mode: document.getElementById('pref-dark-mode').checked ? 1 : 0,
+            weight_unit: document.getElementById('pref-weight-unit').value,
+            height_unit: document.getElementById('pref-height-unit').value,
+            language,
+            sounds: document.getElementById('pref-sounds').checked ? 1 : 0,
+            notifications: notificationsEnabled ? 1 : 0,
+            notification_time: notificationsEnabled ? notificationTime : null,
+            notification_days: notificationsEnabled ? notificationDays : null
+        };
+    };
+
+    const applyPreferenceSideEffects = (preferences) => {
+        if (preferences.dark_mode) {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+
+        if (preferences.language && typeof applyLanguage === 'function') {
+            applyLanguage(preferences.language);
+        }
+
+        if (preferences.notifications && typeof initNotifications === 'function') {
+            setTimeout(() => {
+                initNotifications();
+            }, 500);
+        }
+    };
+
+    document.getElementById('btn-save-profile-all')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btn-save-profile-all');
+        if (!btn) return;
+
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Enregistrement en cours...';
+
         try {
-            const language = document.getElementById('pref-language').value;
-            const notificationsEnabled = document.getElementById('pref-notifications').checked;
-            
-            // Collecter les jours de notification (FR-13)
-            const notificationDays = Array.from(document.querySelectorAll('.notification-day:checked'))
-                .map(cb => parseInt(cb.value));
-            const notificationTime = document.getElementById('pref-notification-time').value;
-            
-            await api.updatePreferences({
-                dark_mode: document.getElementById('pref-dark-mode').checked,
-                weight_unit: document.getElementById('pref-weight-unit').value,
-                height_unit: document.getElementById('pref-height-unit').value,
-                language: language,
-                sounds: document.getElementById('pref-sounds').checked,
-                notifications: notificationsEnabled ? 1 : 0,
-                notification_time: notificationsEnabled ? notificationTime : null,
-                notification_days: notificationsEnabled ? notificationDays : null
-            });
-            
-            // Appliquer le mode sombre immédiatement
-            if (document.getElementById('pref-dark-mode').checked) {
-                document.body.classList.add('dark-mode');
-            } else {
-                document.body.classList.remove('dark-mode');
+            const profileData = collectProfileFormData();
+            await api.updateProfile(profileData);
+
+            const preferencesData = collectPreferencesFormData();
+            await api.updatePreferences(preferencesData);
+            applyPreferenceSideEffects(preferencesData);
+
+            if (typeof saveExtendedProfile === 'function') {
+                await saveExtendedProfile({ silent: true });
             }
-            
-            // Appliquer la langue
-            applyLanguage(language);
-            
-            // Réinitialiser les notifications si activées (FR-13)
-            if (notificationsEnabled && typeof initNotifications === 'function') {
+
+            await loadProfile();
+            if (typeof loadExtendedProfile === 'function') {
+                await loadExtendedProfile();
+            }
+
+            if (typeof advanceWorkflow === 'function') {
                 setTimeout(() => {
-                    initNotifications();
-                }, 500);
+                    advanceWorkflow();
+                }, 300);
             }
-            
-            alert('Préférences mises à jour!');
+
+            btn.textContent = 'Génération du plan...';
+
+            const profile = await api.getProfile();
+            const startTime = Date.now();
+            const data = await api.generatePlan(profile);
+            const generationTime = Date.now() - startTime;
+            const slaMet = generationTime <= 5000;
+
+            btn.textContent = originalText;
+            btn.disabled = false;
+
+            if (data && data.plan) {
+                showPage('workout');
+                if (typeof displayWorkoutPlan === 'function') {
+                    await displayWorkoutPlan(data.plan);
+                } else {
+                    setTimeout(async () => {
+                        const plan = await loadWorkoutPlan();
+                        if (plan && typeof displayWorkoutPlan === 'function') {
+                            await displayWorkoutPlan(plan);
+                        }
+                    }, 100);
+                }
+            } else {
+                alert(`Profil enregistré et plan généré en ${generationTime}ms ! ${slaMet ? '✅' : '⚠️'}`);
+                loadDashboard();
+            }
         } catch (error) {
-            alert('Erreur: ' + error.message);
+            console.error('Erreur sauvegarde profil complet:', error);
+            alert('Erreur: ' + (error?.message || 'Impossible de sauvegarder le profil'));
+            btn.textContent = originalText;
+            btn.disabled = false;
         }
     });
 
