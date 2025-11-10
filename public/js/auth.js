@@ -2,6 +2,24 @@
 let currentUser = null;
 let isNewUser = false; // Flag pour indiquer si c'est un nouvel utilisateur
 
+function resetConsentState() {
+    localStorage.removeItem('consent-data');
+    localStorage.removeItem('consent-given');
+    const consentModal = document.getElementById('consent-modal');
+    if (consentModal) {
+        consentModal.classList.remove('active');
+        consentModal.scrollTop = 0;
+    }
+    const consentCheckbox = document.getElementById('consent-checkbox');
+    const consentAccept = document.getElementById('consent-accept');
+    if (consentCheckbox) {
+        consentCheckbox.checked = false;
+    }
+    if (consentAccept) {
+        consentAccept.disabled = true;
+    }
+}
+
 // Vérifier si le profil est complet (workflow nouveau utilisateur)
 async function isProfileComplete() {
     try {
@@ -533,6 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await api.register(email, password, name);
             currentUser = data.user;
             isNewUser = true; // Inscription = nouvel utilisateur
+            resetConsentState(); // Forcer l'affichage du formulaire de consentement après inscription
             console.log('Inscription réussie, affichage de l\'application...');
             // Attendre un peu pour s'assurer que le token est bien stocké
             setTimeout(() => {
