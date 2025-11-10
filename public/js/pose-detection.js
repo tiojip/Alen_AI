@@ -5,6 +5,7 @@ let isDetecting = false;
 let overlayLastScore = null;
 let overlayLastFeedback = [];
 let overlayLastUpdate = 0;
+let overlayLastSeverity = 'ok';
 
 const POSE_CONNECTIONS = [
     [0, 1], [1, 2], [2, 3], [3, 7],
@@ -324,6 +325,9 @@ function renderPostureOverlay(ctx, width, height, analysis) {
     const feedback = analysis?.feedback ?? overlayLastFeedback;
     const label = getScoreLabel(score);
     const color = getScoreColor(score);
+    const primaryFeedback = getPrimaryFeedback(feedback);
+    const severity = primaryFeedback?.severity || (feedback && feedback.length ? 'low' : 'ok');
+    overlayLastSeverity = severity;
 
     // Ne rien afficher si aucune donnée récente
     if (score === null || score === undefined) {
@@ -345,7 +349,6 @@ function renderPostureOverlay(ctx, width, height, analysis) {
     ctx.fillStyle = color;
     ctx.fillText(label, 32, 74);
 
-    const primaryFeedback = getPrimaryFeedback(feedback);
     if (primaryFeedback) {
         const feedbackHeight = 90;
         const yStart = height - feedbackHeight - 24;
@@ -369,6 +372,8 @@ function renderPostureOverlay(ctx, width, height, analysis) {
         ctx.font = '600 16px "Inter", Arial, sans-serif';
         ctx.fillText('✓ Posture stable', 32, yStart + 32);
     }
+
+    drawStatusIndicator(ctx, width, height, severity, color);
 
     ctx.restore();
 }
@@ -410,6 +415,66 @@ function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
         }
     }
     ctx.fillText(line.trim(), x, y);
+}
+
+function drawStatusIndicator(ctx, width, height, severity, baseColor) {
+    const now = Date.now();
+    const padding = 24;
+    const indicatorRadius = 16;
+    let lightColor = baseColor;
+    let borderColor = baseColor;
+    let glowOpacity = 0.45;
+    let borderWidth = 6;
+
+    if (severity === 'high') {
+        borderColor = '#e74c3c';
+        lightColor = '#ff5c5c';
+        borderWidth = 10;
+        glowOpacity = 0.65;
+    } else if (severity === 'medium') {
+        borderColor = '#f1c40f';
+        lightColor = '#ffe082';
+        borderWidth = 8;
+        glowOpacity = 0.55;
+    } else if (severity === 'low') {
+        borderColor = '#f39c12';
+        lightColor = '#ffda79';
+        borderWidth = 7;
+        glowOpacity = 0.5;
+    } else {
+        borderColor = '#2ecc71';
+        lightColor = '#7bed9f';
+        borderWidth = 6;
+        glowOpacity = 0.35;
+    }
+
+    const pulse = Math.sin(now / 200) * 0.3 + 0.7;
+    const glowRadius = indicatorRadius * (1.8 + pulse * 0.4);
+
+    ctx.save();
+
+    ctx.globalAlpha = glowOpacity;
+    ctx.fillStyle = lightColor;
+    ctx.beginPath();
+    ctx.arc(padding, height - padding, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = borderColor;
+    ctx.beginPath();
+    ctx.arc(padding, height - padding, indicatorRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.lineWidth = borderWidth;
+    ctx.strokeStyle = borderColor;
+    ctx.strokeRect(
+        borderWidth / 2,
+        borderWidth / 2,
+        width - borderWidth,
+        height - borderWidth
+    );
+
+    ctx.restore();
 }
 
 // Jouer un son d'avertissement postural (FR-10)
