@@ -316,13 +316,21 @@ async function loadProfile() {
 
         // Remplir le formulaire de profil
         if (userProfile) {
-            document.getElementById('profile-name').value = userProfile.name || '';
-            document.getElementById('profile-age').value = userProfile.age || '';
-            document.getElementById('profile-weight').value = userProfile.weight || '';
-            document.getElementById('profile-height').value = userProfile.height || '';
-            document.getElementById('profile-level').value = userProfile.fitness_level || 'beginner';
-            document.getElementById('profile-goals').value = userProfile.goals || '';
-            document.getElementById('profile-constraints').value = userProfile.constraints || '';
+            const nameInput = document.getElementById('profile-name');
+            const ageInput = document.getElementById('profile-age');
+            const weightInput = document.getElementById('profile-weight');
+            const heightInput = document.getElementById('profile-height');
+            const levelSelect = document.getElementById('profile-level');
+            const goalsInput = document.getElementById('profile-goals');
+            const constraintsInput = document.getElementById('profile-constraints');
+
+            if (nameInput && userProfile.name != null) nameInput.value = userProfile.name;
+            if (ageInput && userProfile.age != null) ageInput.value = userProfile.age;
+            if (weightInput && userProfile.weight != null) weightInput.value = userProfile.weight;
+            if (heightInput && userProfile.height != null) heightInput.value = userProfile.height;
+            if (levelSelect && userProfile.fitness_level) levelSelect.value = userProfile.fitness_level;
+            if (goalsInput && userProfile.goals != null) goalsInput.value = userProfile.goals;
+            if (constraintsInput && userProfile.constraints != null) constraintsInput.value = userProfile.constraints;
         }
 
         // Remplir les préférences
