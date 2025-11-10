@@ -711,8 +711,15 @@
                 <div id="eval-instructions" class="eval-instructions"></div>
                 <div id="eval-feedback" class="feedback-box"></div>
                 <div id="eval-scores" class="eval-scores hidden"></div>
+                <div id="eval-live-info" class="eval-live-info hidden">
+                    <p id="eval-exercise-description" class="eval-description"></p>
+                    <p id="eval-live-score" class="eval-live-score">Score en temps réel: <strong>--</strong>/100</p>
+                </div>
                 <div class="eval-controls">
                     <button id="btn-start-eval" class="btn-primary">Commencer l'évaluation</button>
+                    <button id="btn-eval-prev" class="btn-secondary hidden">Précédent</button>
+                    <button id="btn-eval-pause" class="btn-secondary hidden">Pause</button>
+                    <button id="btn-eval-skip" class="btn-secondary hidden">Passer</button>
                     <button id="btn-next-exercise" class="btn-primary hidden">Exercice suivant</button>
                     <button id="btn-finish-eval" class="btn-primary hidden">Terminer</button>
                     <button id="btn-cancel-eval" class="btn-secondary hidden">Annuler</button>

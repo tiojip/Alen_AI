@@ -966,6 +966,14 @@ let evalPostureData = []; // Stocker les données de posture pour chaque exercic
 let evalStartTime = null;
 let evalTimer = null;
 let evalScoreInterval = null; // Intervalle pour calculer le score en temps réel
+let evalPaused = false;
+let evalPauseAccumulated = 0;
+
+const evalExerciseDescriptions = {
+    squat: 'Pliez les genoux en gardant le dos droit, les talons au sol et remontez sans verrouiller les genoux.',
+    plank: 'Maintenez une planche en alignant tête, épaules et hanches, abdominaux gainés et respiration régulière.',
+    lunge: 'Avancez d’un grand pas, descendez en gardant le genou avant aligné avec la cheville puis remontez en contrôlant.'
+};
 
 async function startPostureEvaluation() {
     const btnStart = document.getElementById('btn-start-eval');
@@ -974,8 +982,13 @@ async function startPostureEvaluation() {
     const btnCancel = document.getElementById('btn-cancel-eval');
     const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
     const btnRestart = document.getElementById('btn-restart-eval');
+    const btnPause = document.getElementById('btn-eval-pause');
+    const btnPrev = document.getElementById('btn-eval-prev');
+    const btnSkip = document.getElementById('btn-eval-skip');
     const statusDiv = document.getElementById('eval-status');
     const progressFill = document.getElementById('eval-progress-fill');
+    const liveInfo = document.getElementById('eval-live-info');
+    const liveScoreEl = document.getElementById('eval-live-score');
     
     if (btnStart) btnStart.classList.add('hidden');
     if (btnNext) btnNext.classList.add('hidden');
@@ -983,6 +996,14 @@ async function startPostureEvaluation() {
     if (btnCancel) btnCancel.classList.remove('hidden'); // Afficher le bouton Annuler
     if (btnGeneratePlan) btnGeneratePlan.classList.add('hidden');
     if (btnRestart) btnRestart.classList.add('hidden');
+    if (btnPause) {
+        btnPause.classList.remove('hidden');
+        btnPause.textContent = 'Pause';
+    }
+    if (btnPrev) btnPrev.classList.add('hidden');
+    if (btnSkip) btnSkip.classList.remove('hidden');
+    if (liveInfo) liveInfo.classList.remove('hidden');
+    if (liveScoreEl) liveScoreEl.innerHTML = 'Score en temps réel: <strong>--</strong>/100';
     
     const video = document.getElementById('eval-video');
     const canvas = document.getElementById('eval-canvas');
@@ -994,6 +1015,8 @@ async function startPostureEvaluation() {
     evalCurrentExercise = 0;
     evalScores = [];
     evalPostureData = [];
+    evalPaused = false;
+    evalPauseAccumulated = 0;
     
     if (statusDiv) statusDiv.textContent = 'Évaluation en cours...';
     startEvalExercise();
@@ -1019,6 +1042,8 @@ function cancelPostureEvaluation() {
     evalScores = [];
     evalPostureData = [];
     evalStartTime = null;
+    evalPaused = false;
+    evalPauseAccumulated = 0;
     
     // Réinitialiser l'interface
     const btnStart = document.getElementById('btn-start-eval');
@@ -1027,11 +1052,15 @@ function cancelPostureEvaluation() {
     const btnCancel = document.getElementById('btn-cancel-eval');
     const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
     const btnRestart = document.getElementById('btn-restart-eval');
+    const btnPause = document.getElementById('btn-eval-pause');
+    const btnPrev = document.getElementById('btn-eval-prev');
+    const btnSkip = document.getElementById('btn-eval-skip');
     const statusDiv = document.getElementById('eval-status');
     const progressFill = document.getElementById('eval-progress-fill');
     const instructions = document.getElementById('eval-instructions');
     const scoresDiv = document.getElementById('eval-scores');
     const liveScoreEl = document.getElementById('eval-live-score');
+    const liveInfo = document.getElementById('eval-live-info');
     const feedbackBox = document.getElementById('eval-feedback');
     
     if (btnStart) btnStart.classList.remove('hidden');
@@ -1040,11 +1069,15 @@ function cancelPostureEvaluation() {
     if (btnCancel) btnCancel.classList.add('hidden');
     if (btnGeneratePlan) btnGeneratePlan.classList.add('hidden');
     if (btnRestart) btnRestart.classList.add('hidden');
+    if (btnPause) btnPause.classList.add('hidden');
+    if (btnPrev) btnPrev.classList.add('hidden');
+    if (btnSkip) btnSkip.classList.add('hidden');
     
     if (statusDiv) statusDiv.textContent = 'Prêt à commencer';
     if (progressFill) progressFill.style.width = '0%';
     if (scoresDiv) scoresDiv.classList.add('hidden');
-    if (liveScoreEl) liveScoreEl.style.display = 'none';
+    if (liveInfo) liveInfo.classList.add('hidden');
+    if (liveScoreEl) liveScoreEl.innerHTML = 'Score en temps réel: <strong>--</strong>/100';
     
     if (instructions) {
         instructions.innerHTML = '';
@@ -1068,28 +1101,47 @@ function startEvalExercise() {
     const progressFill = document.getElementById('eval-progress-fill');
     const btnNext = document.getElementById('btn-next-exercise');
     const scoresDiv = document.getElementById('eval-scores');
+    const descriptionEl = document.getElementById('eval-exercise-description');
+    const liveScoreEl = document.getElementById('eval-live-score');
+    const btnPause = document.getElementById('btn-eval-pause');
+    const btnPrev = document.getElementById('btn-eval-prev');
+    const btnSkip = document.getElementById('btn-eval-skip');
     
     // Réinitialiser les données pour cet exercice
+    evalScores = evalScores.slice(0, evalCurrentExercise);
     evalPostureData[evalCurrentExercise] = {
         scores: [],
         landmarks: [],
         timestamps: []
     };
+    evalPaused = false;
+    evalPauseAccumulated = 0;
     
     if (instructions) {
+        const description = evalExerciseDescriptions[exercise.type] || evalExerciseDescriptions[exercise.name.toLowerCase()] || 'Effectuez le mouvement avec contrôle et respiration régulière.';
         instructions.innerHTML = `
             <h3>Exercice ${evalCurrentExercise + 1}/${evalExercises.length}: ${exercise.name}</h3>
             <p>Effectuez ${exercise.reps} ${exercise.reps > 1 ? 'répétitions' : 'répétition'} de ${exercise.name}.</p>
             <p>Le système analysera votre posture en temps réel avec MediaPipe (≥5 repères corporels).</p>
-            <p id="eval-live-score" style="font-size: 1.2rem; margin-top: 1rem; color: var(--primary-color);">
-                Score en temps réel: <strong>--</strong>/100
-            </p>
+            <p class="eval-description">${description}</p>
         `;
     }
 
     if (statusDiv) statusDiv.textContent = `Exercice ${evalCurrentExercise + 1}/${evalExercises.length}: ${exercise.name}`;
     if (progressFill) progressFill.style.width = '0%';
     if (scoresDiv) scoresDiv.classList.add('hidden');
+    if (descriptionEl) {
+        descriptionEl.textContent = evalExerciseDescriptions[exercise.type] || evalExerciseDescriptions[exercise.name.toLowerCase()] || 'Effectuez le mouvement avec contrôle et respiration régulière.';
+    }
+    if (liveScoreEl) {
+        liveScoreEl.innerHTML = 'Score en temps réel: <strong>--</strong>/100';
+    }
+    if (btnPause) {
+        btnPause.classList.remove('hidden');
+        btnPause.textContent = 'Pause';
+    }
+    if (btnPrev) btnPrev.classList.toggle('hidden', evalCurrentExercise === 0);
+    if (btnSkip) btnSkip.classList.remove('hidden');
 
     // Démarrer le timer
     evalStartTime = Date.now();
@@ -1098,6 +1150,7 @@ function startEvalExercise() {
     
     // Calculer le score en temps réel toutes les 500ms (FR-05)
     evalScoreInterval = setInterval(() => {
+        if (evalPaused) return;
         if (window.evalCurrentLandmarks && typeof calculatePostureScore === 'function') {
             const canvas = document.getElementById('eval-canvas');
             const video = document.getElementById('eval-video');
@@ -1105,10 +1158,10 @@ function startEvalExercise() {
                 const score = calculatePostureScore(window.evalCurrentLandmarks, canvas.width || 640, canvas.height || 480);
                 evalPostureData[evalCurrentExercise].scores.push(score);
                 evalPostureData[evalCurrentExercise].landmarks.push(JSON.parse(JSON.stringify(window.evalCurrentLandmarks)));
-                evalPostureData[evalCurrentExercise].timestamps.push(Date.now() - evalStartTime);
+                const relativeTime = Date.now() - evalStartTime + evalPauseAccumulated;
+                evalPostureData[evalCurrentExercise].timestamps.push(relativeTime);
                 
                 // Afficher le score en temps réel
-                const liveScoreEl = document.getElementById('eval-live-score');
                 if (liveScoreEl) {
                     liveScoreEl.innerHTML = `Score en temps réel: <strong>${score}</strong>/100`;
                 }
@@ -1117,38 +1170,13 @@ function startEvalExercise() {
     }, 500);
     
     evalTimer = setInterval(() => {
-        elapsed = Date.now() - evalStartTime;
+        if (evalPaused) return;
+        elapsed = Date.now() - evalStartTime + evalPauseAccumulated;
         const progress = Math.min((elapsed / exercise.duration) * 100, 100);
         if (progressFill) progressFill.style.width = progress + '%';
         
         if (elapsed >= exerciseDuration) {
-            clearInterval(evalTimer);
-            if (evalScoreInterval) clearInterval(evalScoreInterval);
-            
-            // Calculer le score moyen pour cet exercice basé sur les données réelles
-            const exerciseData = evalPostureData[evalCurrentExercise];
-            let avgScore = 0;
-            
-            if (exerciseData.scores.length > 0) {
-                avgScore = Math.round(
-                    exerciseData.scores.reduce((sum, s) => sum + s, 0) / exerciseData.scores.length
-                );
-            } else {
-                // Fallback si aucune donnée collectée
-                avgScore = calculateEvalScore(exercise.name);
-            }
-            
-            evalScores.push({ 
-                exercise: exercise.name, 
-                score: avgScore,
-                data: exerciseData // Stocker les données pour analyse
-            });
-            
-            // Afficher le bouton suivant
-            if (btnNext) {
-                btnNext.classList.remove('hidden');
-                btnNext.textContent = evalCurrentExercise < evalExercises.length - 1 ? 'Exercice suivant' : 'Terminer';
-            }
+            completeCurrentEvalExercise();
         }
     }, 100);
 }
@@ -1178,7 +1206,10 @@ async function finishPostureEvaluation() {
     if (evalTimer) clearInterval(evalTimer);
     if (evalScoreInterval) clearInterval(evalScoreInterval);
     
-    const avgScore = Math.round(evalScores.reduce((sum, s) => sum + s.score, 0) / evalScores.length);
+    const validScores = evalScores.filter(entry => entry && typeof entry.score === 'number');
+    const avgScore = validScores.length > 0
+        ? Math.round(validScores.reduce((sum, s) => sum + s.score, 0) / validScores.length)
+        : 0;
     const instructions = document.getElementById('eval-instructions');
     const statusDiv = document.getElementById('eval-status');
     const scoresDiv = document.getElementById('eval-scores');
@@ -1186,17 +1217,23 @@ async function finishPostureEvaluation() {
     const btnNext = document.getElementById('btn-next-exercise');
     const btnFinish = document.getElementById('btn-finish-eval');
     const progressFill = document.getElementById('eval-progress-fill');
+    const liveInfo = document.getElementById('eval-live-info');
     const liveScoreEl = document.getElementById('eval-live-score');
     const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
     const btnRestart = document.getElementById('btn-restart-eval');
+    const btnCancel = document.getElementById('btn-cancel-eval');
+    const btnPause = document.getElementById('btn-eval-pause');
+    const btnPrev = document.getElementById('btn-eval-prev');
+    const btnSkip = document.getElementById('btn-eval-skip');
     
     if (statusDiv) statusDiv.textContent = 'Évaluation terminée!';
     if (progressFill) progressFill.style.width = '100%';
-    if (liveScoreEl) liveScoreEl.style.display = 'none';
+    if (liveInfo) liveInfo.classList.add('hidden');
+    if (liveScoreEl) liveScoreEl.innerHTML = 'Score en temps réel: <strong>--</strong>/100';
     
     // Compter les repères détectés (FR-05)
     let totalLandmarksDetected = 0;
-    evalPostureData.forEach(exData => {
+    evalPostureData.filter(Boolean).forEach(exData => {
         if (exData.landmarks && exData.landmarks.length > 0) {
             const lastLandmarks = exData.landmarks[exData.landmarks.length - 1];
             const visible = lastLandmarks.filter(l => l && l.visibility > 0.5).length;
@@ -1218,23 +1255,24 @@ async function finishPostureEvaluation() {
         scoresDiv.innerHTML = `
             <h4>Détails par exercice:</h4>
             <ul>
-                ${evalScores.map(s => `
+                ${validScores.map(s => `
                     <li><strong>${s.exercise}:</strong> ${s.score}/100 
                         ${s.score >= 80 ? '✅ Excellent' : s.score >= 60 ? '✓ Bon' : '⚠️ À améliorer'}
-                        ${s.data && s.data.scores.length > 0 ? `(${s.data.scores.length} mesures)` : ''}
+                        ${s.data && s.data.scores && s.data.scores.length > 0 ? `(${s.data.scores.length} mesures)` : ''}
                     </li>
                 `).join('')}
             </ul>
             <p><strong>Recommandation:</strong> ${avgScore >= 80 ? 'Niveau avancé recommandé' : avgScore >= 60 ? 'Niveau intermédiaire recommandé' : 'Niveau débutant recommandé'}</p>
         `;
     }
-
-    const btnCancel = document.getElementById('btn-cancel-eval');
     
     if (btnStart) btnStart.classList.add('hidden');
     if (btnNext) btnNext.classList.add('hidden');
     if (btnFinish) btnFinish.classList.add('hidden');
     if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnPause) btnPause.classList.add('hidden');
+    if (btnPrev) btnPrev.classList.add('hidden');
+    if (btnSkip) btnSkip.classList.add('hidden');
     if (btnGeneratePlan) {
         btnGeneratePlan.disabled = false;
         btnGeneratePlan.textContent = 'Générer le plan d\'entraînement';
@@ -1244,15 +1282,7 @@ async function finishPostureEvaluation() {
 
     // Sauvegarder le niveau évalué dans le profil et enregistrer le score (FR-05)
     await saveEvaluatedLevel(avgScore);
-    await saveEvaluationScore(avgScore, evalScores, evalPostureData);
-    
-    // Vérifier si on doit passer à l'étape suivante du workflow (nouvel utilisateur)
-    if (typeof advanceWorkflow === 'function') {
-        // Attendre un peu pour que l'évaluation soit bien sauvegardée
-        setTimeout(() => {
-            advanceWorkflow();
-        }, 500);
-    }
+    await saveEvaluationScore(avgScore, validScores, evalPostureData);
 }
 
 async function saveEvaluatedLevel(score) {
@@ -1300,6 +1330,10 @@ async function generatePlanAfterEvaluation() {
                 await displayWorkoutPlan(plan);
             }
         }
+
+        if (typeof advanceWorkflow === 'function') {
+            advanceWorkflow();
+        }
     } catch (error) {
         alert('Erreur: ' + error.message);
     } finally {
@@ -1322,7 +1356,7 @@ async function saveEvaluationScore(avgScore, scores, postureData) {
             overallScore: avgScore,
             exerciseScores: scores,
             timestamp: new Date().toISOString(),
-            landmarksDetected: postureData.reduce((max, ex) => {
+            landmarksDetected: postureData.filter(Boolean).reduce((max, ex) => {
                 if (ex.landmarks && ex.landmarks.length > 0) {
                     const last = ex.landmarks[ex.landmarks.length - 1];
                     return Math.max(max, last.filter(l => l && l.visibility > 0.5).length);
@@ -1337,6 +1371,101 @@ async function saveEvaluationScore(avgScore, scores, postureData) {
     } catch (error) {
         console.error('Erreur sauvegarde score évaluation:', error);
     }
+}
+
+function completeCurrentEvalExercise(options = {}) {
+    const exercise = evalExercises[evalCurrentExercise];
+    if (!exercise) return;
+
+    if (evalTimer) {
+        clearInterval(evalTimer);
+        evalTimer = null;
+    }
+    if (evalScoreInterval) {
+        clearInterval(evalScoreInterval);
+        evalScoreInterval = null;
+    }
+
+    const exerciseData = evalPostureData[evalCurrentExercise] || { scores: [], landmarks: [], timestamps: [] };
+    let avgScore = 0;
+
+    if (!options.skip && exerciseData.scores && exerciseData.scores.length > 0) {
+        avgScore = Math.round(
+            exerciseData.scores.reduce((sum, s) => sum + s, 0) / exerciseData.scores.length
+        );
+    } else if (options.skip) {
+        avgScore = 0;
+        exerciseData.skipped = true;
+    } else {
+        avgScore = calculateEvalScore(exercise.name);
+    }
+
+    evalScores[evalCurrentExercise] = {
+        exercise: exercise.name,
+        score: avgScore,
+        data: exerciseData
+    };
+
+    const btnNext = document.getElementById('btn-next-exercise');
+    if (btnNext) {
+        btnNext.classList.remove('hidden');
+        btnNext.textContent = evalCurrentExercise < evalExercises.length - 1 ? 'Exercice suivant' : 'Terminer';
+    }
+
+    const btnPause = document.getElementById('btn-eval-pause');
+    if (btnPause) btnPause.textContent = 'Pause';
+
+    evalPaused = false;
+    evalPauseAccumulated = 0;
+}
+
+function toggleEvalPause() {
+    const btnPause = document.getElementById('btn-eval-pause');
+    if (!btnPause) return;
+
+    if (!evalPaused) {
+        evalPaused = true;
+        evalPauseAccumulated += Date.now() - evalStartTime;
+        btnPause.textContent = 'Reprendre';
+    } else {
+        evalPaused = false;
+        evalStartTime = Date.now();
+        btnPause.textContent = 'Pause';
+    }
+}
+
+function skipEvalExercise() {
+    const exercise = evalExercises[evalCurrentExercise];
+    if (!exercise) return;
+
+    if (!evalPostureData[evalCurrentExercise]) {
+        evalPostureData[evalCurrentExercise] = { scores: [], landmarks: [], timestamps: [], skipped: true };
+    } else {
+        evalPostureData[evalCurrentExercise].skipped = true;
+        evalPostureData[evalCurrentExercise].scores = [];
+    }
+
+    completeCurrentEvalExercise({ skip: true });
+    nextEvalExercise();
+}
+
+function previousEvalExercise() {
+    if (evalCurrentExercise <= 0) return;
+
+    if (evalTimer) {
+        clearInterval(evalTimer);
+        evalTimer = null;
+    }
+    if (evalScoreInterval) {
+        clearInterval(evalScoreInterval);
+        evalScoreInterval = null;
+    }
+
+    evalPaused = false;
+    evalPauseAccumulated = 0;
+
+    evalCurrentExercise = Math.max(0, evalCurrentExercise - 1);
+    startEvalExercise();
 }
 
 // Event listeners
@@ -1373,6 +1502,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnRestartEval = document.getElementById('btn-restart-eval');
     if (btnRestartEval) {
         btnRestartEval.addEventListener('click', restartPostureEvaluation);
+    }
+
+    const btnEvalPause = document.getElementById('btn-eval-pause');
+    if (btnEvalPause) {
+        btnEvalPause.addEventListener('click', toggleEvalPause);
+    }
+
+    const btnEvalSkip = document.getElementById('btn-eval-skip');
+    if (btnEvalSkip) {
+        btnEvalSkip.addEventListener('click', skipEvalExercise);
+    }
+
+    const btnEvalPrev = document.getElementById('btn-eval-prev');
+    if (btnEvalPrev) {
+        btnEvalPrev.addEventListener('click', previousEvalExercise);
     }
 
     const btnPause = document.getElementById('btn-pause');

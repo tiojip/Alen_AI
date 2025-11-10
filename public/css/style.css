@@ -1458,6 +1458,25 @@ body.dark-mode .quick-action small {
     border-radius: 4px;
 }
 
+.eval-live-info {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-color);
+    border-radius: 4px;
+}
+
+.eval-live-score {
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.eval-description {
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    opacity: 0.85;
+}
+
 .eval-controls {
     display: flex;
     gap: 1rem;
