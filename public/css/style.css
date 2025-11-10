@@ -1394,16 +1394,6 @@ body.dark-mode .quick-action small {
     color: var(--primary-color);
 }
 
-.profile-actions {
-    display: flex;
-    justify-content: center;
-    margin: 2rem 0;
-}
-
-.profile-actions .btn-primary {
-    min-width: 260px;
-}
-
 .profile-save-footer {
     display: flex;
     flex-direction: column;
