@@ -972,6 +972,8 @@ async function startPostureEvaluation() {
     const btnNext = document.getElementById('btn-next-exercise');
     const btnFinish = document.getElementById('btn-finish-eval');
     const btnCancel = document.getElementById('btn-cancel-eval');
+    const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
+    const btnRestart = document.getElementById('btn-restart-eval');
     const statusDiv = document.getElementById('eval-status');
     const progressFill = document.getElementById('eval-progress-fill');
     
@@ -979,6 +981,8 @@ async function startPostureEvaluation() {
     if (btnNext) btnNext.classList.add('hidden');
     if (btnFinish) btnFinish.classList.add('hidden');
     if (btnCancel) btnCancel.classList.remove('hidden'); // Afficher le bouton Annuler
+    if (btnGeneratePlan) btnGeneratePlan.classList.add('hidden');
+    if (btnRestart) btnRestart.classList.add('hidden');
     
     const video = document.getElementById('eval-video');
     const canvas = document.getElementById('eval-canvas');
@@ -1021,6 +1025,8 @@ function cancelPostureEvaluation() {
     const btnNext = document.getElementById('btn-next-exercise');
     const btnFinish = document.getElementById('btn-finish-eval');
     const btnCancel = document.getElementById('btn-cancel-eval');
+    const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
+    const btnRestart = document.getElementById('btn-restart-eval');
     const statusDiv = document.getElementById('eval-status');
     const progressFill = document.getElementById('eval-progress-fill');
     const instructions = document.getElementById('eval-instructions');
@@ -1032,6 +1038,8 @@ function cancelPostureEvaluation() {
     if (btnNext) btnNext.classList.add('hidden');
     if (btnFinish) btnFinish.classList.add('hidden');
     if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnGeneratePlan) btnGeneratePlan.classList.add('hidden');
+    if (btnRestart) btnRestart.classList.add('hidden');
     
     if (statusDiv) statusDiv.textContent = 'Prêt à commencer';
     if (progressFill) progressFill.style.width = '0%';
@@ -1179,6 +1187,8 @@ async function finishPostureEvaluation() {
     const btnFinish = document.getElementById('btn-finish-eval');
     const progressFill = document.getElementById('eval-progress-fill');
     const liveScoreEl = document.getElementById('eval-live-score');
+    const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
+    const btnRestart = document.getElementById('btn-restart-eval');
     
     if (statusDiv) statusDiv.textContent = 'Évaluation terminée!';
     if (progressFill) progressFill.style.width = '100%';
@@ -1221,10 +1231,16 @@ async function finishPostureEvaluation() {
 
     const btnCancel = document.getElementById('btn-cancel-eval');
     
-    if (btnStart) btnStart.classList.remove('hidden');
+    if (btnStart) btnStart.classList.add('hidden');
     if (btnNext) btnNext.classList.add('hidden');
     if (btnFinish) btnFinish.classList.add('hidden');
     if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnGeneratePlan) {
+        btnGeneratePlan.disabled = false;
+        btnGeneratePlan.textContent = 'Générer le plan d\'entraînement';
+        btnGeneratePlan.classList.remove('hidden');
+    }
+    if (btnRestart) btnRestart.classList.remove('hidden');
 
     // Sauvegarder le niveau évalué dans le profil et enregistrer le score (FR-05)
     await saveEvaluatedLevel(avgScore);
@@ -1260,6 +1276,41 @@ async function saveEvaluatedLevel(score) {
     } catch (error) {
         console.error('Erreur sauvegarde niveau:', error);
     }
+}
+
+async function generatePlanAfterEvaluation() {
+    const btnGeneratePlan = document.getElementById('btn-generate-plan-after-eval');
+    if (!btnGeneratePlan) return;
+
+    const originalText = btnGeneratePlan.textContent;
+    btnGeneratePlan.disabled = true;
+    btnGeneratePlan.textContent = 'Génération en cours...';
+
+    try {
+        const profile = await api.getProfile();
+        const data = await api.generatePlan(profile);
+
+        showPage('workout');
+
+        if (data && data.plan && typeof displayWorkoutPlan === 'function') {
+            await displayWorkoutPlan(data.plan);
+        } else if (typeof loadWorkoutPlan === 'function' && typeof displayWorkoutPlan === 'function') {
+            const plan = await loadWorkoutPlan();
+            if (plan) {
+                await displayWorkoutPlan(plan);
+            }
+        }
+    } catch (error) {
+        alert('Erreur: ' + error.message);
+    } finally {
+        btnGeneratePlan.disabled = false;
+        btnGeneratePlan.textContent = originalText;
+    }
+}
+
+function restartPostureEvaluation() {
+    cancelPostureEvaluation();
+    startPostureEvaluation();
 }
 
 // Enregistrer le score d'évaluation posturale (FR-05)
@@ -1312,6 +1363,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 cancelPostureEvaluation();
             }
         });
+    }
+
+    const btnGeneratePlanAfterEval = document.getElementById('btn-generate-plan-after-eval');
+    if (btnGeneratePlanAfterEval) {
+        btnGeneratePlanAfterEval.addEventListener('click', generatePlanAfterEvaluation);
+    }
+
+    const btnRestartEval = document.getElementById('btn-restart-eval');
+    if (btnRestartEval) {
+        btnRestartEval.addEventListener('click', restartPostureEvaluation);
     }
 
     const btnPause = document.getElementById('btn-pause');

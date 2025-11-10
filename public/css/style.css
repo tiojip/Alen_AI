@@ -1463,6 +1463,7 @@ body.dark-mode .quick-action small {
     gap: 1rem;
     justify-content: center;
     margin-top: 1rem;
+    flex-wrap: wrap;
 }
 
 /* Catalogue d'exercices */
