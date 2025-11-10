@@ -2,6 +2,9 @@
 let pose = null;
 let camera = null;
 let isDetecting = false;
+let overlayLastScore = null;
+let overlayLastFeedback = [];
+let overlayLastUpdate = 0;
 
 const POSE_CONNECTIONS = [
     [0, 1], [1, 2], [2, 3], [3, 7],
@@ -46,33 +49,36 @@ function onPoseResults(results) {
     canvas.height = video.videoHeight;
 
     ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (results.poseLandmarks) {
-        // Vérifier qu'au moins 5 repères sont détectés (FR-05)
-        const visibleLandmarks = results.poseLandmarks.filter(l => l && l.visibility > 0.5);
-        
-        if (visibleLandmarks.length >= 5) {
-            // Dessiner le squelette (overlay) - FR-05
-            drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-            drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1, radius: 3 });
+        // Dessiner le flux vidéo sur le canvas pour avoir un support unique (et permettre l'overlay HUD)
+        ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
-            // Stocker les landmarks pour l'évaluation (FR-05)
-            // Utiliser une variable globale accessible depuis workout.js
-            window.evalCurrentLandmarks = results.poseLandmarks;
+        if (results.poseLandmarks) {
+            const visibleLandmarks = results.poseLandmarks.filter(l => l && l.visibility > 0.5);
 
-            // Analyser la posture
-            analyzePosture(results.poseLandmarks, canvas.width, canvas.height);
-        } else {
-            // Afficher un message si pas assez de repères détectés
-            ctx.fillStyle = '#FFA500';
-            ctx.font = '20px Arial';
-            ctx.fillText('Positionnez-vous face à la caméra', 10, 30);
+            if (visibleLandmarks.length >= 5) {
+                const analysis = analyzePosture(results.poseLandmarks, canvas.width, canvas.height);
+
+                const overlayColor = getScoreColor(analysis?.score);
+                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: overlayColor, lineWidth: 4 });
+                drawLandmarks(ctx, results.poseLandmarks, { color: overlayColor, lineWidth: 2, radius: 4 });
+
+                window.evalCurrentLandmarks = results.poseLandmarks;
+
+                renderPostureOverlay(ctx, canvas.width, canvas.height, analysis);
+            } else {
+                overlayLastScore = null;
+                overlayLastFeedback = [];
+                ctx.fillStyle = 'rgba(0,0,0,0.55)';
+                ctx.fillRect(12, 12, Math.min(canvas.width - 24, 320), 64);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '600 18px "Inter", Arial, sans-serif';
+                ctx.fillText('Positionnez-vous face à la caméra', 28, 52);
+            }
         }
-    }
 
-    ctx.restore();
+        ctx.restore();
 }
 
 // Amélioration du suivi postural en temps réel (FR-10)
@@ -95,7 +101,7 @@ const POSTURE_THRESHOLDS = {
 };
 
 function analyzePosture(landmarks, width, height) {
-    if (!landmarks || landmarks.length < 33) return;
+    if (!landmarks || landmarks.length < 33) return null;
     
     const feedback = [];
     const now = Date.now();
@@ -221,7 +227,6 @@ function analyzePosture(landmarks, width, height) {
         }
     }
 
-    // Calculer le score postural en temps réel
     const postureScore = calculatePostureScore(landmarks, width, height);
 
     // Stocker les données posturales pour analyse (FR-10)
@@ -271,6 +276,140 @@ function analyzePosture(landmarks, width, height) {
         playPostureWarningSound('warning');
         lastAudioFeedbackTime = now;
     }
+    overlayLastScore = postureScore;
+    overlayLastFeedback = feedback;
+    overlayLastUpdate = Date.now();
+
+    window.currentPostureScore = postureScore;
+    window.currentPostureFeedback = feedback;
+
+    return {
+        score: postureScore,
+        feedback
+    };
+}
+
+function getScoreColor(score) {
+    if (typeof score !== 'number') {
+        return '#00FF00';
+    }
+    if (score >= 90) return '#2ecc71';
+    if (score >= 75) return '#f1c40f';
+    if (score >= 60) return '#e67e22';
+    return '#e74c3c';
+}
+
+function getScoreLabel(score) {
+    if (typeof score !== 'number') {
+        return 'En attente de repères';
+    }
+    if (score >= 90) return 'Posture excellente';
+    if (score >= 75) return 'Posture solide';
+    if (score >= 60) return 'À corriger';
+    return 'Corrigez immédiatement';
+}
+
+function getPrimaryFeedback(feedback = []) {
+    if (!feedback || feedback.length === 0) {
+        return null;
+    }
+    const priority = feedback.find(f => f.severity === 'high') ||
+        feedback.find(f => f.severity === 'medium') ||
+        feedback[0];
+    return priority;
+}
+
+function renderPostureOverlay(ctx, width, height, analysis) {
+    const score = analysis?.score ?? overlayLastScore;
+    const feedback = analysis?.feedback ?? overlayLastFeedback;
+    const label = getScoreLabel(score);
+    const color = getScoreColor(score);
+
+    // Ne rien afficher si aucune donnée récente
+    if (score === null || score === undefined) {
+        return;
+    }
+
+    ctx.save();
+
+    const hudWidth = Math.min(260, width - 32);
+    const hudHeight = 86;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    fillRoundedRect(ctx, 16, 16, hudWidth, hudHeight, 12);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '600 22px "Inter", Arial, sans-serif';
+    ctx.fillText(`Score: ${Math.round(score)}/100`, 32, 52);
+
+    ctx.font = '500 15px "Inter", Arial, sans-serif';
+    ctx.fillStyle = color;
+    ctx.fillText(label, 32, 74);
+
+    const primaryFeedback = getPrimaryFeedback(feedback);
+    if (primaryFeedback) {
+        const feedbackHeight = 90;
+        const yStart = height - feedbackHeight - 24;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        fillRoundedRect(ctx, 16, yStart, width - 32, feedbackHeight, 12);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '600 18px "Inter", Arial, sans-serif';
+        ctx.fillText('Conseil posture', 32, yStart + 34);
+
+        ctx.font = '400 15px "Inter", Arial, sans-serif';
+        const message = primaryFeedback.message.replace(/^[⚠️💡✓ ]+/g, '');
+        wrapCanvasText(ctx, message, 32, yStart + 60, width - 64, 22);
+    } else {
+        const tipHeight = 58;
+        const yStart = height - tipHeight - 24;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        fillRoundedRect(ctx, 16, yStart, 210, tipHeight, 10);
+
+        ctx.fillStyle = '#2ecc71';
+        ctx.font = '600 16px "Inter", Arial, sans-serif';
+        ctx.fillText('✓ Posture stable', 32, yStart + 32);
+    }
+
+    ctx.restore();
+}
+
+function fillRoundedRect(ctx, x, y, w, h, r) {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, w, h, radius);
+    } else {
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + w - radius, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+        ctx.lineTo(x + w, y + h - radius);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+        ctx.lineTo(x + radius, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    }
+    ctx.fill();
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+
+    for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        const testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+            ctx.fillText(line.trim(), x, y);
+            line = words[n] + ' ';
+            y += lineHeight;
+        } else {
+            line = testLine;
+        }
+    }
+    ctx.fillText(line.trim(), x, y);
 }
 
 // Jouer un son d'avertissement postural (FR-10)
