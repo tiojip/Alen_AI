@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -43,8 +44,29 @@ app.use((req, res, next) => {
 
 app.use(express.static('public'));
 
+const isVercel = Boolean(process.env.VERCEL);
+const defaultDbPath = path.join(__dirname, 'coaching.db');
+const dbPath = process.env.SQLITE_DB_PATH || (isVercel ? path.join('/tmp', 'coaching.db') : defaultDbPath);
+
+if (isVercel) {
+  try {
+    const writableDir = path.dirname(dbPath);
+    if (!fs.existsSync(writableDir)) {
+      fs.mkdirSync(writableDir, { recursive: true });
+    }
+    // Copie éventuelle d'un fichier de base si présent localement
+    if (!fs.existsSync(dbPath) && fs.existsSync(defaultDbPath)) {
+      fs.copyFileSync(defaultDbPath, dbPath);
+    }
+  } catch (copyErr) {
+    console.error('Erreur préparation base SQLite pour Vercel:', copyErr);
+  }
+}
+
+console.log(`Utilisation de la base SQLite : ${dbPath}`);
+
 // Initialisation de la base de données
-const db = new sqlite3.Database('./coaching.db', (err) => {
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Erreur de connexion à la base de données:', err.message);
   } else {
