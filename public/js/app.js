@@ -811,6 +811,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const btnProfileGoDashboard = document.getElementById('btn-profile-go-dashboard');
+    if (btnProfileGoDashboard) {
+        btnProfileGoDashboard.addEventListener('click', () => {
+            showPage('dashboard');
+            if (typeof loadDashboard === 'function') {
+                loadDashboard();
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
     // Progression
     document.getElementById('nav-progress')?.addEventListener('click', () => {
         loadProgress();
