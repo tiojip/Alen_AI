@@ -54,9 +54,8 @@ if (isVercel) {
     if (!fs.existsSync(writableDir)) {
       fs.mkdirSync(writableDir, { recursive: true });
     }
-    // Copie éventuelle d'un fichier de base si présent localement
-    if (!fs.existsSync(dbPath) && fs.existsSync(defaultDbPath)) {
-      fs.copyFileSync(defaultDbPath, dbPath);
+    if (!fs.existsSync(dbPath)) {
+      fs.writeFileSync(dbPath, '');
     }
   } catch (copyErr) {
     console.error('Erreur préparation base SQLite pour Vercel:', copyErr);
@@ -66,7 +65,7 @@ if (isVercel) {
 console.log(`Utilisation de la base SQLite : ${dbPath}`);
 
 // Initialisation de la base de données
-const db = new sqlite3.Database(dbPath, (err) => {
+const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
   if (err) {
     console.error('Erreur de connexion à la base de données:', err.message);
   } else {
