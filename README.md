@@ -1,105 +1,95 @@
 # Application Web de Coaching Virtuel Intelligent
 
-Plateforme de coaching sportif numérique proposant un accompagnement personnalisé avec génération de plan d'entraînement, suivi de posture en temps réel, analytics de progression et interactions IA. Toutes les exigences fonctionnelles FR-01 à FR-15 sont couvertes avec un socle technique simple (Node.js + SQLite + JavaScript vanilla).
+Plateforme monopage (SPA) de coaching sportif qui combine profil utilisateur, génération de plans d'entraînement et évaluation posturale en temps réel. Le projet repose uniquement sur Node.js, Express, SQLite et JavaScript vanilla côté client.
 
-## Aperçu rapide
-- API Express avec authentification JWT, gestion des préférences et conformité Loi 25 (consentement, export et suppression des données).
-- Génération de programmes via moteur de règles enrichi ou OpenAI (fallback automatique, SLA surveillés, versioning et rollback).
-- Séance interactive utilisant MediaPipe Pose pour l'analyse posturale (<250 ms), HUD temps réel, alertes audio et arrêt automatique en cas de risque.
-- Module post-séance fournissant conseils instantanés (IA ou règles) et enregistrement détaillé de la séance.
-- Tableau de bord progression avec graphiques Canvas, filtres temporels, indicateurs d'adhérence/cohérence et logs de performance.
-- Coach IA conversationnel avec streaming SSE (<2 s premier token), suggestions contextuelles et mode fallback déterministe.
-- Notifications, préférences (dark mode, unités, langue, réglages d'alertes) et service worker pour rappels planifiés.
+## Ce qui est inclus actuellement
+- Authentification complète avec JWT, inscription, connexion et réinitialisation du mot de passe (modal accessible directement depuis la page de connexion).
+- Onboarding conforme (modal de consentement Loi 25 après inscription) et gestion centrale du profil : un bouton unique sauvegarde toutes les sections et lance automatiquement la génération du plan personnalisé.
+- Tableau de bord modernisé avec sections statistiques, résumé du plan courant et actions rapides, compatible desktop/tablette/mobile.
+- Séance d'entraînement interactive :
+  - Explications affichées pour chaque exercice (évaluation et plan).
+  - Évaluation posturale en direct via MediaPipe Pose avec HUD incrusté (score, feedback, statut couleur, balise pulsée).
+  - Contrôles instantanés pour l'évaluation (précédent, pause/reprendre, passer) et actions post-évaluation (générer un plan, recommencer).
+- Navigation responsive : barre desktop conservée et menu « sandwich » (hamburger) pour mobile.
+- Gestion du catalogue d’exercices, génération de plans et sauvegarde en base SQLite.
+- Déploiement validé sur Vercel avec base `coaching.db` déplacée automatiquement dans `/tmp` pour la persistance éphémère.
 
-## Architecture
+## Architecture technique
 ### Backend (`server.js`)
-- Express + SQLite (`sqlite3`), authentification JWT, hashing `bcryptjs`, tokens réinitialisation mot de passe et middleware CORS/JSON.
-- Initialisation + migrations idempotentes des tables : `users`, `user_profile_extended`, `preferences`, `workout_plans`, `workout_plan_history`, `sessions`, `progress`, `performance_logs`, `password_reset_tokens`.
-- Routes principales :
-  - Auth (`/api/auth/register`, `/login`, `/password-reset/request|confirm`)
-  - Profil & conformité (`/api/user/profile`, `/profile/extended`, `/preferences`, `/consent`, `/data-export`, `/account`)
-  - Plans d'entraînement (`/api/workout/generate`, `/plan`, `/plan/history`, `/plan/rollback`, `/optimize`)
-  - Sessions & progression (`/api/session`, `/session/history`, `/session/advice`, `/api/progress`)
-  - Analytics & optimisation (`/api/performance/indicators`, `/api/performance/logs`)
-  - Coach IA (`/api/chat`, `/api/chat/suggestions`)
-- Intégration OpenAI optionnelle : génération structurée (schema JSON), optimisation SLA, fallback moteur de règles.
-- Support Vercel (`vercel.json`), gestion chemin DB (`SQLITE_DB_PATH`), compatibilité environnement éphémère.
+- Express 4 + `sqlite3`, JSON middleware, CORS basique.
+- Tables : `users`, `user_profile_extended`, `preferences`, `workout_plans`, `workout_plan_history`, `sessions`, `password_reset_tokens`.
+- Routes principales : auth (`/api/auth/*`), profil (`/api/user/profile`, `/api/user/profile/extended`, `/api/user/preferences`), plans (`/api/workout/*`), sessions et statistiques basiques.
+- Gestion JWT (signature, vérification middleware) et hashing de mots de passe `bcryptjs`.
+- Support Vercel : détection `process.env.VERCEL`, copie/migration de la base vers `/tmp/coaching.db`.
+- Variables d'environnement chargées via `.env` (non commité) ou Vercel dashboard.
 
 ### Frontend (`public/`)
-- `index.html` SPA orchestrée par JavaScript vanilla et modules dédiés.
-- `js/api.js` client REST centralisé avec gestion JWT.
-- `js/auth.js`, `js/app.js`, `js/consent.js`, `js/profile-extended.js`: onboarding, profil, consentement Loi 25.
-- `js/plan-editor.js`, `js/exercises-catalog.js`: édition de plan, navigation catalogue.
-- `js/workout.js`, `js/pose-detection.js`: pilotage séance, capture caméra, analyse posturale, overlays HUD, audio.
-- `js/post-session.js`, `js/progress-charts.js`: conseils post-séance, graphiques Canvas (progression, volume, cohérence).
-- `js/notifications.js`: préférences notifications, service worker `sw.js`, scheduling côté client.
-- `css/style.css`: design responsive, mode sombre, composants HUD.
-- `exercises/exercises.json`: référentiel d'exercices enrichi (tags muscles, équipement, niveau).
+- `index.html` : unique page contenant les sections (auth, dashboard, profil, séance, etc.).
+- `js/api.js` : client Fetch avec stockage du token dans `localStorage`.
+- `js/auth.js` : formulaire login/inscription, modale de reset, affichage du consentement après inscription, toggle menu mobile.
+- `js/app.js` : routage client simple, chargement du dashboard, agrégation des données de profil, génération automatique du plan depuis le bouton global.
+- `js/workout.js` : orchestration de la séance, affichage des instructions, gestion de l'évaluation posturale (contrôles, progression, plan post-évaluation).
+- `js/pose-detection.js` : intégration MediaPipe Pose, analyse du score, rendu de l’overlay HUD directement dans le canvas vidéo, état global pour le HUD.
+- `js/profile-extended.js` : sauvegarde des données étendues (mode silencieux pour la sauvegarde globale).
+- `js/exercises-catalog.js` : consultation et lancement de séances depuis le catalogue.
+- `css/style.css` : grille responsive, dashboard redesign, styles HUD, menu mobile, boutons post-évaluation.
 
-### Données & conformité
-- Consentement Loi 25 stocké dans `users` (date/version) avec export JSON complet (`/api/user/data-export`) et suppression cascade.
-- Historique de plans (`workout_plan_history`) pour audit + rollback; logs de performance pour traçabilité FR-15.
-- Notifications planifiées stockées dans `preferences` (jours/heure en JSON) et relayées via service worker.
-
-## Fonctionnalités détaillées
-- **Sécurité & Authentification** : JWT 30 jours, mots de passe hashés, reset token avec hash + expiration, logs minimaux.
-- **Profil étendu** : collecte biométrique, habitudes de vie, préférences coaching, disponibilité hebdo, objectifs mesurables.
-- **Génération de plans (FR-06/07)** : AI (OpenAI) avec schéma JSON validé, fallback règles. Versioning, seed, SLA ≤5 s, historisation et rollback en <3 s.
-- **Optimisation continue (FR-15)** : analyse sessions récentes, métriques posture/completion, ajustement intensité, logs persistés.
-- **Séances interactives (FR-05/10)** : détection MediaPipe CDN, scoring 0-100, feedback visuel + audio, arrêt auto risque élevé, enregistrement posture pour analytics.
-- **Chat coach IA (FR-14)** : streaming SSE, prompts contextualisés (profil + historique), suggestions IA/quatre options, fallback déterministe si absence API.
-- **Conseils post-séance (FR-11)** : IA (<3 s) ou règles (messages contextualisés). Sauvegarde `session_data` enrichi (durée, erreurs, feedback).
-- **Progression & analytics (FR-12)** : graphiques Canvas sans dépendance externe, filtres 7/30/90/180/365/all, métriques adhérence, cohérence, fréquence, volume.
-- **Notifications & préférences (FR-13)** : toggles mode sombre/sons/notifications, planification locale, service worker `sw.js`, badge, focus fenêtre lors clic.
-- **Catalogue & planification (FR-08/09)** : planification hebdomadaire dynamique selon disponibilités, éditeur drag/drop, calcul temps séance par objectif.
-
-## Installation & lancement
-1. **Prérequis** : Node.js ≥ 14, npm, caméra (Chrome/Firefox/Edge), accès réseau au CDN MediaPipe.
-2. **Dépendances** :
+## Prise en main
+1. **Cloner & installer**
    ```bash
+   git clone https://github.com/<votre-compte>/<votre-repo>.git
+   cd <votre-repo>
    npm install
    ```
-3. **Variables d'environnement** : créer un fichier `.env` à la racine (voir tableau ci-dessous).
-4. **Démarrer** :
-   ```bash
-   # Production locale
-   npm start
-
-   # Développement (watch nodemon)
-   npm run dev
+2. **Configurer `.env`**
    ```
-5. **Accès** : ouvrir `http://localhost:3000`, autoriser la caméra lors des séances.
+   PORT=3000
+   JWT_SECRET=change-me
+   SQLITE_DB_PATH=./coaching.db          # facultatif en local
+   OPENAI_API_KEY=                       # optionnel (voir ci-dessous)
+   ```
+   > `.env` est ignoré par git. Ne le commitez pas.
+3. **Lancer**
+   ```bash
+   npm start          # serveur Express sur http://localhost:3000
+   ```
+   Autorisez l'accès caméra lors des séances de posture.
 
-### Variables d'environnement
-| Variable | Description | Valeur par défaut |
-| --- | --- | --- |
-| `PORT` | Port HTTP Express | `3000` |
-| `JWT_SECRET` | Clé de signature JWT (changer en production) | `your-secret-key-change-in-production` |
-| `OPENAI_API_KEY` | Clé optionnelle pour génération IA (plans/chat/post-séance) | _vide_ |
-| `OPENAI_PLAN_MODEL` | Modèle OpenAI pour les plans | `gpt-4o-mini` |
-| `SQLITE_DB_PATH` | Chemin personnalisé vers la base SQLite | `./coaching.db` (ou `/tmp/coaching.db` sur Vercel) |
-| `NODE_ENV` | `production` pour activer certaines protections | _vide_ |
-| `VERCEL` | Défini automatiquement sur Vercel (gère chemin DB) | _vide_ |
+### Option OpenAI
+Le code peut appeler l’API OpenAI pour la génération de plans ou de feedback si `OPENAI_API_KEY` est renseigné. Sans clé, le backend retombe sur les règles locales.
 
-## Déploiement
-- **Vercel** : configuration prête (`vercel.json`). Le backend (`server.js`) est déployé via `@vercel/node`, les assets statiques via `@vercel/static`. Sur Vercel, la base SQLite est stockée dans `/tmp`; prévoir export ou persistance externe pour production.
-- **Autre hébergeur** : veiller à ce que le dossier contenant `coaching.db` soit accessible en lecture/écriture. Activer HTTPS pour les accès caméra en production.
+## Déploiement sur Vercel
+1. Pousser le dépôt sur GitHub (branch `main`).
+2. Créer un projet Vercel relié au repo.
+3. Définir les variables d’environnement (`PORT`, `JWT_SECRET`, `OPENAI_API_KEY` si besoin).
+4. Déployer : Vercel détecte le `vercel.json` et build automatiquement.
 
-## Parcours utilisateur type
-1. Inscription / connexion (`auth.js`) → création préférences par défaut.
-2. Consentement Loi 25 (`consent.js`) et remplissage profil étendu (`profile-extended.js`).
-3. Génération du plan (`plan-editor.js`) → édition/ sauvegarde / rollback si besoin.
-4. Séance live (`workout.js` + `pose-detection.js`) avec feedback, stockage `session_data` et envoi de conseils post-séance (`post-session.js`).
-5. Suivi progression (`progress-charts.js`), consultation indicateurs (`/api/performance/indicators`) et optimisation plan (`/api/workout/optimize`).
-6. Interaction coach IA (`chat`), notifications planifiées (`notifications.js`), export/suppression données à tout moment (`/api/user/data-export`, `/api/user/account`).
+**Particularités SQLite** :
+- Vercel offre un FS en lecture seule hors `/tmp`.
+- `server.js` copie la base depuis le repo vers `/tmp/coaching.db` à chaque cold start.
+- Les données persistent uniquement pendant la durée de vie du conteneur (démos OK, production → prévoir base externe).
 
-## Ressources complémentaires
-- `INSTALLATION.md` : guide pas-à-pas détaillé, conseils de dépannage.
-- `public/js/` : modules commentés par fonctionnalité (FR-xx) pour repérage rapide des exigences.
-- `public/css/style.css` : styles HUD posture, dashboards, UI responsive.
+## Parcours utilisateur
+1. L’utilisateur s’inscrit ou se connecte. Après inscription, la modale de consentement s’affiche immédiatement.
+2. Il remplit son profil (données personnelles, préférences, informations avancées) puis clique sur `Enregistrer et générer mon plan personnalisé`. Toutes les sections sont sauvegardées et un plan est créé.
+3. Sur le dashboard, il consulte le résumé du plan, les statistiques et lance la séance.
+4. Pendant l’évaluation posturale :
+   - Les instructions de l’exercice s’affichent (texte court).
+   - Le HUD vidéo montre score, statut visuel dynamique (vert/orange/rouge) et feedback.
+   - Les boutons `Précédent`, `Pause/Reprendre`, `Passer` contrôlent l’évaluation.
+5. En fin d’évaluation, il choisit `Générer le plan d'entraînement` ou `Recommencer l’évaluation`.
 
-## Tests & vérifications
-- Pas de suite de tests automatisés fournie. Recommandations : tester flux critiques (auth, génération plan, séance, export données) et vérifier SLA cible via logs console (`server.js`, modules front) après déploiement.
+## Conseils de maintenance
+- Lancer `npm start` avec `VERCEL=1` pour reproduire le comportement Vercel en local si nécessaire.
+- Vérifier `public/js/pose-detection.js` après mise à jour de MediaPipe : le HUD dépend des dimensions du canvas.
+- Lors des modifications UI, tester sur desktop (>1024px) et mobile (<768px) pour valider la barre de navigation et les modales.
+- Toujours vérifier que la modale « Mot de passe oublié » reste accessible sans connexion.
+
+## Dépannage rapide
+- **Caméra bloquée** : vérifier HTTPS (obligatoire en production) ou permissions navigateur.
+- **Pas de redirection après login** : s’assurer que le token est stocké (`localStorage.getItem('jwtToken')`) et que l’API retourne un statut 200.
+- **Base vide sur Vercel** : créer un nouvel utilisateur; la base est neuve à chaque déploiement.
+- **Différences locales/Vercel** : remettre à niveau avec `git pull`, puis `npm install`. Relancer `npm start`.
 
 ---
-Pour toute question ou amélioration, se référer aux commentaires dans `server.js` et les modules front-end (recherche `FR-xx` pour retrouver la fonctionnalité associée). Aucune donnée sensible n'est collectée sans consentement explicite et l'utilisateur peut exporter ou supprimer son profil à tout moment.
+Pour toute amélioration, ouvrez une issue ou créez une PR. Toute contribution doit respecter la sauvegarde des données utilisateur et la conformité au consentement explicite.
