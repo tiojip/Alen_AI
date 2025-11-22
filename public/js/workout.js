@@ -142,6 +142,43 @@ async function loadWorkoutPlan() {
 // Rendre la fonction globale pour qu'elle soit accessible depuis app.js et auth.js
 window.loadWorkoutPlan = loadWorkoutPlan;
 
+// Fonction pour traduire le niveau de fitness
+function translateFitnessLevel(level) {
+    if (!level) return 'Non défini';
+    const levelLower = String(level).toLowerCase();
+    if (levelLower === 'beginner' || levelLower === 'débutant') return 'Débutant';
+    if (levelLower === 'intermediate' || levelLower === 'intermédiaire') return 'Intermédiaire';
+    if (levelLower === 'advanced' || levelLower === 'avancé') return 'Avancé';
+    return level; // Retourner la valeur originale si non reconnue
+}
+
+// Fonction pour formater les objectifs
+function formatGoals(goals) {
+    if (!goals) return 'Général';
+    const goalsStr = String(goals).trim();
+    if (goalsStr === '' || goalsStr.toLowerCase() === 'general') return 'Général';
+    
+    // Capitaliser la première lettre
+    return goalsStr.charAt(0).toUpperCase() + goalsStr.slice(1).toLowerCase();
+}
+
+// Fonction pour formater la durée
+function formatDuration(duration) {
+    if (!duration) return '4 semaines';
+    const durationStr = String(duration).trim();
+    // Si c'est déjà en français, le retourner tel quel
+    if (durationStr.includes('semaine') || durationStr.includes('mois')) {
+        return durationStr;
+    }
+    // Sinon, convertir "4 weeks" en "4 semaines"
+    const match = durationStr.match(/(\d+)\s*(week|weeks|semaine|semaines)/i);
+    if (match) {
+        const num = match[1];
+        return `${num} ${num === '1' ? 'semaine' : 'semaines'}`;
+    }
+    return durationStr;
+}
+
 async function displayWorkoutPlan(plan) {
     const container = document.getElementById('workout-days');
     if (!container) return;
@@ -150,6 +187,22 @@ async function displayWorkoutPlan(plan) {
         container.innerHTML = '<p>Aucun plan disponible. Générez-en un depuis le dashboard.</p>';
         return;
     }
+
+    // Charger le profil utilisateur pour récupérer les valeurs réelles
+    let userProfile = null;
+    try {
+        if (typeof api !== 'undefined' && api.getProfile) {
+            userProfile = await api.getProfile();
+        }
+    } catch (error) {
+        console.warn('Impossible de charger le profil utilisateur:', error);
+    }
+
+    // Utiliser les valeurs du profil si disponibles, sinon celles du plan
+    // Priorité: profil utilisateur > plan généré > valeurs par défaut
+    const fitnessLevel = (userProfile && userProfile.fitness_level) ? userProfile.fitness_level : (plan.level || 'beginner');
+    const goals = (userProfile && userProfile.goals) ? userProfile.goals : (plan.goals || 'general');
+    const duration = plan.duration || '4 weeks';
 
     // Charger le catalogue d'exercices pour les GIFs
     await loadExercisesCatalogForGifs();
@@ -191,19 +244,32 @@ async function displayWorkoutPlan(plan) {
         btnEditPlan.style.display = 'inline-block';
     }
     
-    let html = '<h3 style="margin-bottom: 1.5rem; color: var(--primary-color);">Plan d\'entraînement personnalisé</h3>';
+    // Créer un header plus fluide et moderne
+    const translatedLevel = translateFitnessLevel(fitnessLevel);
+    const formattedGoals = formatGoals(goals);
+    const formattedDuration = formatDuration(duration);
     
-    if (plan.level) {
-        html += `<p style="margin-bottom: 1rem;"><strong>Niveau:</strong> ${plan.level === 'beginner' ? 'Débutant' : plan.level === 'intermediate' ? 'Intermédiaire' : 'Avancé'}</p>`;
-    }
-    if (plan.goals) {
-        html += `<p style="margin-bottom: 1rem;"><strong>Objectifs:</strong> ${plan.goals}</p>`;
-    }
-    if (plan.duration) {
-        html += `<p style="margin-bottom: 1.5rem;"><strong>Durée:</strong> ${plan.duration}</p>`;
-    }
+    let html = `
+        <div class="workout-plan-header">
+            <h3 class="workout-plan-title">Plan d'entraînement personnalisé</h3>
+            <div class="workout-plan-info">
+                <div class="plan-info-item">
+                    <span class="plan-info-label">Niveau</span>
+                    <span class="plan-info-value">${translatedLevel}</span>
+                </div>
+                <div class="plan-info-item">
+                    <span class="plan-info-label">Objectifs</span>
+                    <span class="plan-info-value">${formattedGoals}</span>
+                </div>
+                <div class="plan-info-item">
+                    <span class="plan-info-label">Durée</span>
+                    <span class="plan-info-value">${formattedDuration}</span>
+                </div>
+            </div>
+        </div>
+    `;
     
-    html += '<div style="display: grid; gap: 1rem; margin-top: 1.5rem;">';
+    html += '<div class="workout-days-grid">';
     
     const entries = Object.entries(plan.weeklyPlan);
     entries.forEach(([dayKey, exercisesRaw], index) => {
@@ -249,12 +315,15 @@ async function displayWorkoutPlan(plan) {
             : '<li style="padding: 0.75rem 0; color: var(--text-color); opacity: 0.8;">Aucun exercice prévu ce jour.</li>';
 
         html += `
-            <div class="card" style="margin-bottom: 1rem; border-left: 4px solid var(--primary-color);">
-                <h4 style="color: var(--primary-color); margin-bottom: 1rem;">${dayName}</h4>
-                <ul style="list-style: none; padding: 0; margin-bottom: 1rem;">
+            <div class="card workout-day-card">
+                <div class="workout-day-header">
+                    <h4 class="workout-day-title">${dayName}</h4>
+                    <span class="workout-day-badge">${exercises.length} ${exercises.length === 1 ? 'exercice' : 'exercices'}</span>
+                </div>
+                <ul class="workout-exercises-list">
                     ${exercisesListHtml}
                 </ul>
-                <button class="btn-primary" onclick="startWorkoutSession('${safeKey}')" style="width: 100%;">
+                <button class="btn-primary workout-start-btn" onclick="startWorkoutSession('${safeKey}')">
                     Commencer cette séance
                 </button>
             </div>
@@ -837,6 +906,11 @@ function stopWorkout() {
     
     // Désactiver le stockage des données posturales (FR-10)
     window.currentWorkoutActive = false;
+    
+    // Réinitialiser les variables d'avertissement postural
+    if (typeof window.resetPostureWarning === 'function') {
+        window.resetPostureWarning();
+    }
     
     stopCamera();
     
@@ -1534,12 +1608,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPause = document.getElementById('btn-pause');
     if (btnPause) {
         btnPause.addEventListener('click', () => {
+            const iconElement = btnPause.querySelector('.btn-icon');
             if (workoutTimer) {
                 pauseWorkout();
-                btnPause.textContent = 'Reprendre';
+                if (iconElement) {
+                    iconElement.textContent = '▶';
+                } else {
+                    btnPause.textContent = '▶';
+                }
+                btnPause.title = 'Reprendre';
             } else {
                 resumeWorkout();
-                btnPause.textContent = 'Pause';
+                if (iconElement) {
+                    iconElement.textContent = '⏸';
+                } else {
+                    btnPause.textContent = '⏸';
+                }
+                btnPause.title = 'Pause';
             }
         });
     }

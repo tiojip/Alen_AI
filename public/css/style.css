@@ -894,6 +894,53 @@ body.dark-mode .quick-action small {
     min-height: 400px;
 }
 
+/* Responsive pour mobile - optimiser la hauteur de la vidéo */
+@media (max-width: 768px) {
+    .workout-video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 50vh;
+        max-height: 70vh;
+        width: 100%;
+        margin: 0.75rem auto;
+    }
+    
+    #posture-eval-page .video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 55vh;
+        max-height: 75vh;
+    }
+}
+
+@media (max-width: 600px) {
+    .workout-video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 55vh;
+        max-height: 75vh;
+        margin: 0.5rem auto;
+    }
+    
+    #posture-eval-page .video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 60vh;
+        max-height: 80vh;
+    }
+}
+
+@media (max-width: 420px) {
+    .workout-video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 60vh;
+        max-height: 80vh;
+        margin: 0.5rem auto;
+    }
+    
+    #posture-eval-page .video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 65vh;
+        max-height: 85vh;
+    }
+}
+
 .video-container video,
 .workout-video-container video {
     position: absolute;
@@ -1092,6 +1139,280 @@ body.dark-mode .quick-action small {
     min-height: 44px; /* Taille minimale pour le touch sur mobile */
     touch-action: manipulation; /* Améliore la réactivité tactile */
     -webkit-tap-highlight-color: transparent; /* Supprime le highlight sur tap */
+    position: relative;
+}
+
+/* Boutons avec icônes uniquement */
+.btn-icon-only {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    padding: 0.75rem;
+    border-radius: 50%;
+    aspect-ratio: 1;
+}
+
+.btn-icon-only .btn-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+    display: block;
+}
+
+.btn-text-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Responsive pour les boutons sur mobile */
+@media (max-width: 768px) {
+    .workout-controls {
+        gap: 0.75rem;
+    }
+    
+    .btn-icon-only {
+        min-width: 56px;
+        min-height: 56px;
+        padding: 1rem;
+    }
+    
+    .btn-icon-only .btn-icon {
+        font-size: 1.75rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .workout-controls {
+        gap: 0.5rem;
+        justify-content: space-around;
+    }
+    
+    .btn-icon-only {
+        flex: 1 1 calc(20% - 0.5rem);
+        min-width: 50px;
+        min-height: 50px;
+        max-width: 60px;
+        padding: 0.875rem;
+    }
+    
+    .btn-icon-only .btn-icon {
+        font-size: 1.5rem;
+    }
+}
+
+/* Header du plan d'entraînement - Interface fluide */
+.workout-plan-header {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(33, 150, 243, 0.08));
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(76, 175, 80, 0.15);
+    transition: all 0.3s ease;
+}
+
+.workout-plan-header:hover {
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.15);
+    transform: translateY(-2px);
+}
+
+.workout-plan-title {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 1.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.workout-plan-title::before {
+    content: '💪';
+    font-size: 1.75rem;
+}
+
+.workout-plan-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.plan-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border-left: 3px solid var(--primary-color);
+    transition: all 0.2s ease;
+}
+
+.plan-info-item:hover {
+    background: rgba(76, 175, 80, 0.05);
+    transform: translateX(4px);
+}
+
+.plan-info-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-color);
+    opacity: 0.7;
+    font-weight: 600;
+}
+
+.plan-info-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1.3;
+}
+
+/* Grille des jours d'entraînement */
+.workout-days-grid {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 0;
+}
+
+/* Responsive pour le header du plan */
+@media (max-width: 768px) {
+    .workout-plan-header {
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .workout-plan-title {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+    
+    .workout-plan-info {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    .plan-info-item {
+        padding: 0.625rem;
+    }
+    
+    .plan-info-value {
+        font-size: 1rem;
+    }
+    
+    .workout-days-grid {
+        gap: 1rem;
+    }
+}
+
+/* Cards des jours d'entraînement */
+.workout-day-card {
+    border-left: 4px solid var(--primary-color);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.workout-day-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    transition: width 0.3s ease;
+}
+
+.workout-day-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.15);
+}
+
+.workout-day-card:hover::before {
+    width: 6px;
+}
+
+.workout-day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--bg-color);
+}
+
+.workout-day-title {
+    color: var(--primary-color);
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.workout-day-badge {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.workout-exercises-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+}
+
+.workout-start-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.workout-start-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+@media (max-width: 600px) {
+    .workout-day-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .workout-day-title {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .workout-plan-header {
+        padding: 1rem;
+    }
+    
+    .workout-plan-title {
+        font-size: 1.1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+    
+    .workout-plan-title::before {
+        font-size: 1.5rem;
+    }
 }
 
 .workout-timer {
