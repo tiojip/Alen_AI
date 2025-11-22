@@ -96,12 +96,24 @@ let lastFeedbackTime = 0;
 let lastAudioFeedbackTime = 0;
 let consecutiveHighRiskCount = 0;
 let workoutPostureData = []; // Stocker les données posturales pendant la séance
-let highRiskStartTime = null; // Timestamp du début de la détection de risque élevé
 let highRiskWarningShown = false; // Flag pour s'assurer que l'avertissement n'apparaît qu'une fois
 const FEEDBACK_DELAY = 200; // ms entre chaque feedback visuel (optimisé pour ≤250ms)
 const AUDIO_FEEDBACK_DELAY = 500; // ms entre chaque feedback audio (pour éviter la surcharge)
-const HIGH_RISK_WARNING_DELAY = 10000; // 10 secondes avant d'afficher l'avertissement
+const WORKOUT_START_DELAY = 10000; // 10 secondes après le début de la séance avant de pouvoir afficher l'avertissement
 const HIGH_RISK_THRESHOLD = 3; // Nombre d'erreurs consécutives avant arrêt automatique
+
+// Fonction pour obtenir le temps de début de la séance
+function getWorkoutStartTime() {
+    // Essayer de récupérer depuis workout.js
+    if (typeof window.workoutStartTime !== 'undefined' && window.workoutStartTime !== null) {
+        return window.workoutStartTime;
+    }
+    // Fallback : utiliser une variable globale si disponible
+    if (typeof workoutStartTime !== 'undefined' && workoutStartTime !== null) {
+        return workoutStartTime;
+    }
+    return null;
+}
 
 // Seuils de tolérance configurables (FR-10)
 const POSTURE_THRESHOLDS = {
@@ -273,29 +285,24 @@ function analyzePosture(landmarks, width, height) {
         lastAudioFeedbackTime = now;
         consecutiveHighRiskCount++;
         
-        // Démarrer le timer si c'est le début d'une série d'erreurs critiques
-        if (highRiskStartTime === null) {
-            highRiskStartTime = now;
-            highRiskWarningShown = false; // Réinitialiser le flag au début d'une nouvelle série
-        }
-        
-        // Vérifier si 10 secondes se sont écoulées et que l'avertissement n'a pas encore été affiché
-        const timeSinceHighRiskStart = now - highRiskStartTime;
-        if (timeSinceHighRiskStart >= HIGH_RISK_WARNING_DELAY && !highRiskWarningShown) {
-            triggerAutomaticStop('Risque postural élevé détecté. Séance interrompue pour votre sécurité.');
-            highRiskWarningShown = true; // Marquer que l'avertissement a été affiché
-        }
-        
-        // Arrêt automatique si risque trop élevé (FR-10) - garde-fou supplémentaire
-        if (consecutiveHighRiskCount >= HIGH_RISK_THRESHOLD && !highRiskWarningShown) {
-            triggerAutomaticStop('Risque postural élevé détecté. Séance interrompue pour votre sécurité.');
-            highRiskWarningShown = true;
+        // Vérifier si au moins 10 secondes se sont écoulées depuis le début de la séance
+        const workoutStartTime = getWorkoutStartTime();
+        if (workoutStartTime !== null) {
+            const timeSinceWorkoutStart = now - workoutStartTime;
+            
+            // Afficher l'avertissement seulement si :
+            // 1. Au moins 10 secondes se sont écoulées depuis le début de la séance
+            // 2. L'avertissement n'a pas encore été affiché
+            // 3. Il y a effectivement une mauvaise posture (highRiskErrors.length > 0)
+            if (timeSinceWorkoutStart >= WORKOUT_START_DELAY && !highRiskWarningShown && highRiskErrors.length > 0) {
+                triggerAutomaticStop('Risque postural élevé détecté. Séance interrompue pour votre sécurité.');
+                highRiskWarningShown = true; // Marquer que l'avertissement a été affiché (une seule fois)
+            }
         }
     } else if (feedback.length === 0 || highRiskErrors.length === 0) {
-        // Réinitialiser le compteur et le timer si pas d'erreur critique
+        // Réinitialiser le compteur si pas d'erreur critique
+        // Mais NE PAS réinitialiser highRiskWarningShown pour s'assurer qu'il n'apparaît qu'une fois
         consecutiveHighRiskCount = 0;
-        highRiskStartTime = null;
-        highRiskWarningShown = false;
     }
 
     // Feedback audio pour avertissements moyens
@@ -721,7 +728,6 @@ function stopCamera() {
 
 // Réinitialiser les variables d'avertissement postural
 function resetPostureWarning() {
-    highRiskStartTime = null;
     highRiskWarningShown = false;
     consecutiveHighRiskCount = 0;
 }

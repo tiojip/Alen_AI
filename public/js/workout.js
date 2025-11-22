@@ -374,11 +374,20 @@ async function startWorkoutSession(day) {
     currentSet = 1;
     currentRep = 0;
     
+    // Initialiser le temps de début de la séance (pour l'avertissement postural)
+    workoutStartTime = Date.now();
+    window.workoutStartTime = workoutStartTime;
+    
     // Réinitialiser les données posturales (FR-10)
     if (typeof workoutPostureData !== 'undefined') {
         workoutPostureData = [];
     }
     window.currentWorkoutActive = true; // Flag pour activer le stockage des données posturales
+    
+    // Réinitialiser l'avertissement postural pour la nouvelle séance
+    if (typeof window.resetPostureWarning === 'function') {
+        window.resetPostureWarning();
+    }
     
     const selectionDiv = document.getElementById('workout-selection');
     const activeDiv = document.getElementById('workout-active');
@@ -456,9 +465,18 @@ async function startCatalogExercise(exercise) {
     currentExerciseIndex = 0;
     currentSet = 1;
     currentRep = 0;
+    
+    // Initialiser le temps de début de la séance (pour l'avertissement postural)
+    workoutStartTime = Date.now();
+    window.workoutStartTime = workoutStartTime;
 
     if (typeof workoutPostureData !== 'undefined') {
         workoutPostureData = [];
+    }
+    
+    // Réinitialiser l'avertissement postural pour la nouvelle séance
+    if (typeof window.resetPostureWarning === 'function') {
+        window.resetPostureWarning();
     }
 
     const selectionDiv = document.getElementById('workout-selection');
@@ -537,8 +555,11 @@ async function startExercise() {
     // Mettre à jour les indicateurs (FR-09)
     updateProgressIndicators(exercise);
 
-    // Démarrer le timer
-    workoutStartTime = Date.now();
+    // Démarrer le timer (ne réinitialiser que si pas déjà défini au début de la séance)
+    if (!workoutStartTime) {
+        workoutStartTime = Date.now();
+        window.workoutStartTime = workoutStartTime;
+    }
     startWorkoutTimer();
 
     // Démarrer la barre de progression de l'exercice (FR-09)
@@ -925,12 +946,20 @@ function stopWorkout() {
     currentSet = 1;
     currentRep = 0;
     progressFillElement = null;
+    workoutStartTime = null;
+    window.workoutStartTime = null; // Réinitialiser le temps de début global
     if (typeof workoutPostureData !== 'undefined') {
         workoutPostureData = [];
     }
     const pauseBtn = document.getElementById('btn-pause');
     if (pauseBtn) {
-        pauseBtn.textContent = 'Pause';
+        const iconElement = pauseBtn.querySelector('.btn-icon');
+        if (iconElement) {
+            iconElement.textContent = '⏸';
+        } else {
+            pauseBtn.textContent = '⏸';
+        }
+        pauseBtn.title = 'Pause';
     }
 }
 
