@@ -1071,22 +1071,14 @@ async function generateWorkoutPlanAI(profile, extendedProfile, startTime) {
 
   try {
     const plan = await generateWorkoutPlanWithOpenAI(profile, extendedProfile, remaining);
-    if (plan) {
+    if (plan && plan.weeklyPlan && Object.keys(plan.weeklyPlan).length > 0) {
       return plan;
+    } else {
+      console.warn('Plan généré invalide, utilisation du fallback');
     }
   } catch (error) {
     console.warn('Échec initial via OpenAI (plan) :', error.message || error);
-    if (error.message && error.message.toLowerCase().includes('timeout')) {
-      try {
-        console.log('Nouvelle tentative avec délai prolongé pour récupérer la réponse IA');
-        const extendedPlan = await generateWorkoutPlanWithOpenAI(profile, extendedProfile, 12000);
-        if (extendedPlan) {
-          return extendedPlan;
-        }
-      } catch (secondError) {
-        console.error('Échec seconde tentative OpenAI :', secondError.message || secondError);
-      }
-    }
+    // Ne plus faire de seconde tentative ici car c'est géré dans generateWorkoutPlanWithOpenAI avec retry
   }
 
   console.log('Fallback sur le moteur de règles pour la génération du plan');
@@ -1138,20 +1130,44 @@ const workoutPlanJsonSchema = {
   }
 };
 
-async function generateWorkoutPlanWithOpenAI(profile, extendedProfile, timeBudgetMs = 4000) {
+async function generateWorkoutPlanWithOpenAI(profile, extendedProfile, timeBudgetMs = 4000, retryCount = 0) {
+  const MAX_RETRIES = 2;
   const OpenAI = require('openai');
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const effectiveTimeout = Math.max(1500, Math.min(timeBudgetMs - 250, 10000));
 
-  // Préparer le contexte utilisateur
-  const userContext = buildUserContext(profile, extendedProfile);
+  // Préparer le contexte utilisateur avec validation
+  let userContext;
+  try {
+    userContext = buildUserContext(profile || {}, extendedProfile || {});
+    // Valider que le contexte n'est pas vide
+    if (!userContext || Object.keys(userContext).length === 0) {
+      throw new Error('Contexte utilisateur invalide ou vide');
+    }
+  } catch (error) {
+    console.error('Erreur construction contexte:', error);
+    throw new Error('Impossible de construire le contexte utilisateur');
+  }
 
   const timeoutPromise = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('Timeout OpenAI')), effectiveTimeout)
   );
 
   try {
+    // Limiter la taille du contexte pour éviter les erreurs de token
+    const contextString = JSON.stringify(userContext);
+    if (contextString.length > 4000) {
+      // Réduire le contexte si trop grand
+      const reducedContext = {
+        basicProfile: userContext.basicProfile,
+        physicalMetrics: userContext.physicalMetrics,
+        lifestyleHabits: userContext.lifestyleHabits,
+        motivationAndPsychology: userContext.motivationAndPsychology
+      };
+      userContext = reducedContext;
+    }
+
     const completionPromise = openai.chat.completions.create({
       model: process.env.OPENAI_PLAN_MODEL || 'gpt-4o-mini',
       messages: [
@@ -1176,22 +1192,62 @@ Respecte le schéma et garde les valeurs concises.`
     });
 
     const completion = await Promise.race([completionPromise, timeoutPromise]);
-    const responseText = completion.choices?.[0]?.message?.content?.trim();
+    
+    if (!completion || !completion.choices || completion.choices.length === 0) {
+      throw new Error('Réponse invalide de la part du modèle OpenAI');
+    }
+    
+    const responseText = completion.choices[0]?.message?.content?.trim();
 
     if (!responseText) {
       throw new Error('Réponse vide de la part du modèle OpenAI');
     }
 
-    const cleanResponse = responseText
+    // Nettoyer la réponse
+    let cleanResponse = responseText
       .replace(/```json\s*/gi, '')
       .replace(/```\s*/g, '')
       .trim();
 
-    const aiPlan = JSON.parse(cleanResponse);
+    // Essayer de parser le JSON avec gestion d'erreur améliorée
+    let aiPlan;
+    try {
+      aiPlan = JSON.parse(cleanResponse);
+    } catch (parseError) {
+      // Essayer de corriger les erreurs JSON communes
+      console.warn('Erreur parsing JSON, tentative de correction:', parseError);
+      try {
+        // Supprimer les caractères problématiques
+        cleanResponse = cleanResponse
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']')
+          .replace(/'/g, '"'); // Remplacer les apostrophes simples par des guillemets doubles
+        aiPlan = JSON.parse(cleanResponse);
+      } catch (secondParseError) {
+        throw new Error(`Erreur parsing JSON après correction: ${secondParseError.message}`);
+      }
+    }
 
-    return validateAndEnrichPlan(aiPlan, profile, extendedProfile);
+    // Valider et enrichir le plan
+    const validatedPlan = validateAndEnrichPlan(aiPlan, profile, extendedProfile);
+    
+    // Validation finale
+    if (!validatedPlan || !validatedPlan.weeklyPlan || Object.keys(validatedPlan.weeklyPlan).length === 0) {
+      throw new Error('Plan généré invalide: structure manquante ou vide');
+    }
+
+    return validatedPlan;
   } catch (error) {
-    console.error('Erreur OpenAI (plan):', error.message || error);
+    console.error(`Erreur OpenAI (plan) - tentative ${retryCount + 1}/${MAX_RETRIES + 1}:`, error.message || error);
+    
+    // Retry avec backoff exponentiel si ce n'est pas une erreur de timeout et qu'on n'a pas atteint le max
+    if (retryCount < MAX_RETRIES && !error.message.includes('Timeout')) {
+      const backoffDelay = Math.pow(2, retryCount) * 500; // 500ms, 1000ms, 2000ms
+      console.log(`Nouvelle tentative dans ${backoffDelay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      return generateWorkoutPlanWithOpenAI(profile, extendedProfile, timeBudgetMs, retryCount + 1);
+    }
+    
     throw error;
   }
 }
@@ -1566,21 +1622,84 @@ function buildUserContext(profile = {}, extendedProfile = {}) {
 
 // Valider et enrichir le plan généré par l'IA (FR-06)
 function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
-  // S'assurer que le plan a la structure correcte
-  if (!aiPlan.weeklyPlan) {
-    throw new Error('Plan invalide: structure manquante');
+  // Validation de base
+  if (!aiPlan || typeof aiPlan !== 'object') {
+    throw new Error('Plan invalide: objet manquant');
   }
   
+  // S'assurer que le plan a la structure correcte
+  if (!aiPlan.weeklyPlan || typeof aiPlan.weeklyPlan !== 'object') {
+    throw new Error('Plan invalide: weeklyPlan manquant ou invalide');
+  }
+  
+  // Valider que weeklyPlan n'est pas vide
+  const weeklyPlanKeys = Object.keys(aiPlan.weeklyPlan);
+  if (weeklyPlanKeys.length === 0) {
+    throw new Error('Plan invalide: weeklyPlan vide');
+  }
+  
+  // Valider et nettoyer chaque jour du plan
+  const cleanedWeeklyPlan = {};
+  for (const [day, exercises] of Object.entries(aiPlan.weeklyPlan)) {
+    if (!Array.isArray(exercises)) {
+      console.warn(`Jour ${day} invalide: pas un tableau, conversion...`);
+      cleanedWeeklyPlan[day] = Array.isArray(exercises) ? exercises : [];
+      continue;
+    }
+    
+    // Valider et nettoyer chaque exercice
+    const cleanedExercises = exercises
+      .filter(ex => ex && typeof ex === 'object' && ex.name) // Garder seulement les exercices valides avec un nom
+      .map(ex => {
+        // S'assurer que les valeurs numériques sont valides
+        const cleaned = {
+          name: String(ex.name || 'Exercice sans nom').trim(),
+          sets: ex.sets && Number.isInteger(Number(ex.sets)) && Number(ex.sets) > 0 ? Number(ex.sets) : null,
+          reps: ex.reps && Number.isInteger(Number(ex.reps)) && Number(ex.reps) > 0 ? Number(ex.reps) : null,
+          duration: ex.duration && Number.isInteger(Number(ex.duration)) && Number(ex.duration) > 0 ? Number(ex.duration) : null,
+          rest: ex.rest && Number.isInteger(Number(ex.rest)) && Number(ex.rest) >= 0 ? Number(ex.rest) : 60
+        };
+        
+        // S'assurer qu'au moins sets, reps ou duration est défini
+        if (!cleaned.sets && !cleaned.reps && !cleaned.duration) {
+          // Valeurs par défaut si rien n'est défini
+          cleaned.sets = 3;
+          cleaned.reps = 10;
+        }
+        
+        // Ajouter les propriétés optionnelles si présentes
+        if (ex.type) cleaned.type = String(ex.type);
+        if (ex.tempo) cleaned.tempo = String(ex.tempo);
+        if (ex.focus && Array.isArray(ex.focus)) cleaned.focus = ex.focus;
+        if (ex.notes) cleaned.notes = String(ex.notes);
+        
+        return cleaned;
+      });
+    
+    if (cleanedExercises.length > 0) {
+      cleanedWeeklyPlan[day] = cleanedExercises;
+    }
+  }
+  
+  // Si après nettoyage le plan est vide, utiliser le plan de fallback
+  if (Object.keys(cleanedWeeklyPlan).length === 0) {
+    throw new Error('Plan invalide: aucun exercice valide après nettoyage');
+  }
+  
+  aiPlan.weeklyPlan = cleanedWeeklyPlan;
+  
   // Enrichir avec les métadonnées
-  aiPlan.level = profile.fitness_level || 'beginner';
-  aiPlan.goals = profile.goals || 'general';
-  aiPlan.constraints = profile.constraints || '';
+  aiPlan.level = profile?.fitness_level || 'beginner';
+  aiPlan.goals = profile?.goals || 'general';
+  aiPlan.constraints = profile?.constraints || '';
   aiPlan.version = `1.0.${Date.now()}`;
-  aiPlan.seed = generatePlanSeed(profile, extendedProfile);
+  aiPlan.seed = generatePlanSeed(profile || {}, extendedProfile || {});
   aiPlan.createdAt = new Date().toISOString();
+  aiPlan.duration = aiPlan.duration || '4 weeks';
+  
   const computedBmi =
     extendedProfile?.bmi ||
-    (profile.weight && profile.height
+    (profile?.weight && profile?.height
       ? Number((profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1))
       : null);
 
@@ -1606,7 +1725,7 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
 
   aiPlan.metadata = sanitizeContextObject(enrichedMetadata);
 
-  if (!aiPlan.notes) {
+  if (!aiPlan.notes || aiPlan.notes.trim() === '') {
     aiPlan.notes = `Plan IA basé sur votre profil (${aiPlan.level}) avec prise en compte de vos objectifs "${aiPlan.goals}" et de vos données de profil détaillé.`;
   }
 

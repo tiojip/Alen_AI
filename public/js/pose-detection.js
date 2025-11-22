@@ -44,10 +44,18 @@ function onPoseResults(results) {
     const video = document.getElementById('workout-video') || document.getElementById('eval-video');
     
     if (!canvas || !video) return;
+    
+    // S'assurer que la vidéo a des dimensions valides
+    const videoWidth = video.videoWidth || 640;
+    const videoHeight = video.videoHeight || 480;
+    
+    // Ne mettre à jour les dimensions du canvas que si nécessaire
+    if (canvas.width !== videoWidth || canvas.height !== videoHeight) {
+        canvas.width = videoWidth;
+        canvas.height = videoHeight;
+    }
 
     const ctx = canvas.getContext('2d');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
 
     ctx.save();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -597,31 +605,76 @@ function displayPostureFeedback(feedback, postureScore = null) {
 
 async function startCamera(videoElement, canvasElement) {
     try {
+        // Détecter si on est sur mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                        (window.innerWidth <= 768);
+        
+        // Contraintes vidéo adaptées selon l'appareil
+        const videoConstraints = isMobile ? {
+            facingMode: 'user', // Caméra frontale sur mobile
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 }
+        } : {
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+        };
+        
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480 }
+            video: videoConstraints
         });
         
         videoElement.srcObject = stream;
-        videoElement.onloadedmetadata = () => {
-            videoElement.play();
-            isDetecting = true;
-        };
+        
+        // Attendre que les métadonnées soient chargées
+        await new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+                // Ajuster le canvas aux dimensions réelles de la vidéo
+                const actualWidth = videoElement.videoWidth || 640;
+                const actualHeight = videoElement.videoHeight || 480;
+                
+                // S'assurer que le canvas a les bonnes dimensions
+                if (canvasElement) {
+                    canvasElement.width = actualWidth;
+                    canvasElement.height = actualHeight;
+                }
+                
+                videoElement.play().then(() => {
+                    isDetecting = true;
+                    resolve();
+                }).catch((err) => {
+                    console.warn('Erreur lecture vidéo:', err);
+                    isDetecting = true;
+                    resolve();
+                });
+            };
+        });
 
         if (!pose) {
             initializePose();
         }
 
+        // Utiliser les dimensions réelles de la vidéo
+        const videoWidth = videoElement.videoWidth || 640;
+        const videoHeight = videoElement.videoHeight || 480;
+        
         camera = new Camera(videoElement, {
             onFrame: async () => {
-                await pose.send({ image: videoElement });
+                if (isDetecting && pose) {
+                    await pose.send({ image: videoElement });
+                }
             },
-            width: 640,
-            height: 480
+            width: videoWidth,
+            height: videoHeight
         });
         camera.start();
     } catch (error) {
         console.error('Erreur caméra:', error);
-        alert('Impossible d\'accéder à la caméra. Vérifiez les permissions.');
+        const errorMessage = error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError'
+            ? 'Permission d\'accès à la caméra refusée. Veuillez autoriser l\'accès dans les paramètres de votre navigateur.'
+            : error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError'
+            ? 'Aucune caméra trouvée. Veuillez connecter une caméra.'
+            : 'Impossible d\'accéder à la caméra. Vérifiez les permissions et que votre appareil dispose d\'une caméra.';
+        alert(errorMessage);
     }
 }
 
