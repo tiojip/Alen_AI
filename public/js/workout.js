@@ -238,12 +238,8 @@ async function displayWorkoutPlan(plan) {
     const container = document.getElementById('workout-days');
     if (!container) return;
 
-    if (!plan || !plan.weeklyPlan) {
-        container.innerHTML = '<p>Aucun plan disponible. Générez-en un depuis le dashboard.</p>';
-        return;
-    }
-
-    // Charger le profil utilisateur et le profil étendu pour récupérer toutes les valeurs réelles
+    // Charger le profil utilisateur et le profil étendu AVANT de vérifier le plan
+    // pour pouvoir afficher les informations même si le plan n'existe pas
     let userProfile = null;
     let extendedProfile = null;
     
@@ -263,35 +259,80 @@ async function displayWorkoutPlan(plan) {
         console.warn('Impossible de charger le profil étendu:', error);
     }
 
-    // Utiliser les valeurs du profil si disponibles, sinon celles du plan
-    // Priorité: profil utilisateur > plan généré > valeurs par défaut
-    let fitnessLevel = null;
-    let goals = null;
-    let duration = null;
+    if (!plan || !plan.weeklyPlan) {
+        // Même sans plan, afficher les informations du profil dans l'en-tête
+        let fitnessLevel = 'beginner';
+        let goals = 'general';
+        let durationStr = '4 semaines';
+        
+        if (userProfile) {
+            fitnessLevel = userProfile.fitness_level || 'beginner';
+            goals = userProfile.goals || 'general';
+        }
+        
+        if (extendedProfile && extendedProfile.preferred_session_duration) {
+            durationStr = `${extendedProfile.preferred_session_duration} minutes par séance`;
+        }
+        
+        const translatedLevel = translateFitnessLevel(fitnessLevel);
+        const formattedGoals = formatGoals(goals);
+        const formattedDuration = formatDuration(durationStr);
+        
+        container.innerHTML = `
+            <div class="workout-plan-header">
+                <h3 class="workout-plan-title">Plan d'entraînement personnalisé</h3>
+                <div class="workout-plan-info">
+                    <div class="plan-info-item">
+                        <span class="plan-info-label">Niveau</span>
+                        <span class="plan-info-value">${translatedLevel}</span>
+                    </div>
+                    <div class="plan-info-item">
+                        <span class="plan-info-label">Objectifs</span>
+                        <span class="plan-info-value">${formattedGoals}</span>
+                    </div>
+                    <div class="plan-info-item">
+                        <span class="plan-info-label">Durée</span>
+                        <span class="plan-info-value">${formattedDuration}</span>
+                    </div>
+                </div>
+            </div>
+            <p style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; color: var(--text-color);">
+                Aucun plan disponible. Générez-en un depuis le dashboard.
+            </p>
+        `;
+        return;
+    }
+
+    // Les profils ont déjà été chargés au début de la fonction
+
+    // TOUJOURS utiliser les valeurs du profil utilisateur en priorité absolue
+    // Ne JAMAIS utiliser les valeurs du plan si le profil est disponible
+    let fitnessLevel = 'beginner';
+    let goals = 'general';
+    let durationStr = '4 semaines';
     
-    // Récupérer le niveau de fitness
-    // Priorité: profil utilisateur > plan.level > plan.metadata.fitnessLevel > défaut
-    fitnessLevel = userProfile?.fitness_level || plan.level || plan.metadata?.fitnessLevel || 'beginner';
+    // Récupérer le niveau de fitness - UNIQUEMENT depuis le profil utilisateur
+    if (userProfile?.fitness_level) {
+        fitnessLevel = userProfile.fitness_level;
+    }
     
-    // Récupérer les objectifs
-    // Priorité: profil utilisateur > plan.goals > plan.metadata.primaryGoals > défaut
-    goals = userProfile?.goals || plan.goals || plan.metadata?.primaryGoals || 'general';
+    // Récupérer les objectifs - UNIQUEMENT depuis le profil utilisateur
+    if (userProfile?.goals) {
+        goals = userProfile.goals;
+    }
     
-    // Récupérer la durée
-    // Priorité: durée préférée du profil étendu > plan.duration > plan.metadata.duration > plan.metadata.preferredDuration > défaut
-    if (extendedProfile && extendedProfile.preferred_session_duration) {
-      duration = `${extendedProfile.preferred_session_duration} minutes par séance`;
-    } else if (plan.metadata && plan.metadata.preferredDuration) {
-      duration = `${plan.metadata.preferredDuration} minutes par séance`;
-    } else {
-      duration = plan.duration || plan.metadata?.duration || '4 weeks';
+    // Récupérer la durée - UNIQUEMENT depuis le profil étendu ou utilisateur
+    if (extendedProfile?.preferred_session_duration) {
+        durationStr = `${extendedProfile.preferred_session_duration} minutes par séance`;
+    } else if (userProfile?.preferred_session_duration) {
+        durationStr = `${userProfile.preferred_session_duration} minutes par séance`;
     }
     
     // Log pour debug (peut être retiré en production)
     console.log('Affichage plan - Données récupérées:', {
         fitnessLevel,
         goals,
-        duration,
+        duration: durationStr,
         hasUserProfile: !!userProfile,
         hasExtendedProfile: !!extendedProfile,
         userProfileData: userProfile ? {
@@ -355,7 +396,7 @@ async function displayWorkoutPlan(plan) {
     // Créer un header plus fluide et moderne
     const translatedLevel = translateFitnessLevel(fitnessLevel);
     const formattedGoals = formatGoals(goals);
-    const formattedDuration = formatDuration(duration);
+    const formattedDuration = formatDuration(durationStr);
     
     let html = `
         <div class="workout-plan-header">

@@ -1949,6 +1949,11 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
       : null);
 
   const enrichedMetadata = {
+    // Informations de base du profil
+    fitnessLevel: profile?.fitness_level || 'beginner',
+    primaryGoals: profile?.goals || 'general',
+    constraints: profile?.constraints || '',
+    // Informations du profil étendu
     equipment: extendedProfile?.available_equipment || 'none',
     preferredDuration: extendedProfile?.preferred_session_duration || 30,
     motivation: extendedProfile?.main_motivation || 'health',
@@ -1965,7 +1970,12 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
     medicalHistory: extendedProfile?.medical_history,
     bodyComposition: extendedProfile?.body_composition,
     bmi: computedBmi,
-    generatedBy: 'ai'
+    // Métadonnées techniques
+    generatedBy: 'ai',
+    // Informations démographiques pour référence
+    age: calculateAge(profile?.birthdate, profile?.age),
+    weight: profile?.weight,
+    height: profile?.height
   };
 
   aiPlan.metadata = sanitizeContextObject(enrichedMetadata);

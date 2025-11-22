@@ -37,21 +37,33 @@ async function loadDashboard() {
                 if (planData && planData.plan) {
                     const plan = planData.plan;
                     
-                    // Utiliser userProfile déjà chargé au début de la fonction
-                    const fitnessLevel = userProfile?.fitness_level || plan.level || 'beginner';
-                    const goals = userProfile?.goals || plan.goals || 'general';
+                    // TOUJOURS utiliser les données du profil utilisateur en priorité
+                    // Ne jamais utiliser les données du plan si le profil est disponible
+                    let fitnessLevel = 'beginner';
+                    let goals = 'general';
+                    let duration = '4 semaines';
                     
-                    // Récupérer la durée préférée depuis le profil étendu si disponible
-                    let duration = plan.duration || '4 weeks';
+                    // Récupérer le profil étendu pour toutes les informations
+                    let extendedProfile = null;
                     try {
-                        const extendedProfile = await api.getExtendedProfile().catch(() => null);
-                        if (extendedProfile && extendedProfile.preferred_session_duration) {
-                            duration = `${extendedProfile.preferred_session_duration} minutes par séance`;
-                        } else if (plan.metadata && plan.metadata.preferredDuration) {
-                            duration = `${plan.metadata.preferredDuration} minutes par séance`;
-                        }
+                        extendedProfile = await api.getExtendedProfile().catch(() => null);
                     } catch (error) {
-                        console.warn('Impossible de charger le profil étendu pour la durée:', error);
+                        console.warn('Impossible de charger le profil étendu:', error);
+                    }
+                    
+                    // Priorité absolue: profil utilisateur > profil étendu > défaut
+                    if (userProfile) {
+                        fitnessLevel = userProfile.fitness_level || 'beginner';
+                        goals = userProfile.goals || 'general';
+                    }
+                    
+                    // Durée: priorité absolue au profil étendu
+                    if (extendedProfile && extendedProfile.preferred_session_duration) {
+                        duration = `${extendedProfile.preferred_session_duration} minutes par séance`;
+                    } else if (userProfile && userProfile.preferred_session_duration) {
+                        duration = `${userProfile.preferred_session_duration} minutes par séance`;
+                    } else {
+                        duration = '4 semaines';
                     }
                     
                     // Utiliser les fonctions de formatage si disponibles, sinon formater manuellement
@@ -93,16 +105,78 @@ async function loadDashboard() {
                         planDays.innerHTML = buildPlanDays(plan.weeklyPlan);
                     }
                 } else {
-                    preview.innerHTML = '<p>Aucun plan généré. Créez-en un pour commencer!</p>';
-                    if (heroPlan) heroPlan.textContent = 'Aucun';
+                    // Même sans plan, afficher les informations du profil
+                    preview.innerHTML = `
+                        <p><strong>Niveau:</strong> ${levelLabel}</p>
+                        <p><strong>Objectif clé:</strong> ${formattedGoals}</p>
+                        <p><strong>Durée:</strong> ${formattedDuration}</p>
+                        <p class="muted" style="margin-top: 1rem;">Aucun plan généré. Créez-en un pour commencer!</p>
+                    `;
+                    if (heroPlan) heroPlan.textContent = levelLabel || 'Personnalisé';
                     if (planDays) planDays.innerHTML = `<p class="muted">Génère ton plan pour visualiser les séances de la semaine.</p>`;
                 }
             }
         } catch (planError) {
-            // Si erreur de chargement du plan, afficher message
+            // Si erreur de chargement du plan, afficher quand même les informations du profil
             const preview = document.getElementById('workout-plan-preview');
+            const heroPlan = document.getElementById('dashboard-hero-plan');
+            
+            // Récupérer les informations du profil même en cas d'erreur
+            let fitnessLevel = 'beginner';
+            let goals = 'general';
+            let duration = '4 semaines';
+            
+            if (userProfile) {
+                fitnessLevel = userProfile.fitness_level || 'beginner';
+                goals = userProfile.goals || 'general';
+            }
+            
+            // Essayer de récupérer le profil étendu pour la durée
+            try {
+                const extendedProfile = await api.getExtendedProfile().catch(() => null);
+                if (extendedProfile && extendedProfile.preferred_session_duration) {
+                    duration = `${extendedProfile.preferred_session_duration} minutes par séance`;
+                }
+            } catch (error) {
+                console.warn('Impossible de charger le profil étendu:', error);
+            }
+            
+            // Utiliser les fonctions de formatage
+            let levelLabel, formattedGoals, formattedDuration;
+            if (typeof globalThis !== 'undefined' && typeof globalThis.translateFitnessLevel === 'function') {
+                levelLabel = globalThis.translateFitnessLevel(fitnessLevel);
+            } else if (typeof window !== 'undefined' && typeof window.translateFitnessLevel === 'function') {
+                levelLabel = window.translateFitnessLevel(fitnessLevel);
+            } else {
+                levelLabel = capitalize(fitnessLevel);
+            }
+            
+            if (typeof globalThis !== 'undefined' && typeof globalThis.formatGoals === 'function') {
+                formattedGoals = globalThis.formatGoals(goals);
+            } else if (typeof window !== 'undefined' && typeof window.formatGoals === 'function') {
+                formattedGoals = window.formatGoals(goals);
+            } else {
+                formattedGoals = goals || 'Personnalisation globale';
+            }
+            
+            if (typeof globalThis !== 'undefined' && typeof globalThis.formatDuration === 'function') {
+                formattedDuration = globalThis.formatDuration(duration);
+            } else if (typeof window !== 'undefined' && typeof window.formatDuration === 'function') {
+                formattedDuration = window.formatDuration(duration);
+            } else {
+                formattedDuration = duration || '4 semaines';
+            }
+            
             if (preview) {
-                preview.innerHTML = '<p>Aucun plan généré. Créez-en un pour commencer!</p>';
+                preview.innerHTML = `
+                    <p><strong>Niveau:</strong> ${levelLabel}</p>
+                    <p><strong>Objectif clé:</strong> ${formattedGoals}</p>
+                    <p><strong>Durée:</strong> ${formattedDuration}</p>
+                    <p class="muted" style="margin-top: 1rem;">Impossible de charger le plan. Réessaie plus tard.</p>
+                `;
+            }
+            if (heroPlan) {
+                heroPlan.textContent = levelLabel || 'Personnalisé';
             }
             const planDays = document.getElementById('dashboard-plan-days');
             if (planDays) {

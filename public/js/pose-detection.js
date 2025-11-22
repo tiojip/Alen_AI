@@ -81,9 +81,16 @@ function onPoseResults(results) {
                 overlayLastFeedback = [];
                 ctx.fillStyle = 'rgba(0,0,0,0.55)';
                 ctx.fillRect(12, 12, Math.min(canvas.width - 24, 320), 64);
-                ctx.fillStyle = '#FFFFFF';
-                ctx.font = '600 18px "Inter", Arial, sans-serif';
-                ctx.fillText('Positionnez-vous face à la caméra', 28, 52);
+        // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.translate(-canvas.width, 0);
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '600 18px "Inter", Arial, sans-serif';
+        ctx.fillText('Positionnez-vous face à la caméra', 28, 52);
+        
+        ctx.restore();
             }
         }
 
@@ -375,6 +382,11 @@ function renderPostureOverlay(ctx, width, height, analysis) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     fillRoundedRect(ctx, 16, 16, hudWidth, hudHeight, 12);
 
+    // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.translate(-width, 0);
+    
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '600 22px "Inter", Arial, sans-serif';
     ctx.fillText(`Score: ${Math.round(score)}/100`, 32, 52);
@@ -382,6 +394,8 @@ function renderPostureOverlay(ctx, width, height, analysis) {
     ctx.font = '500 15px "Inter", Arial, sans-serif';
     ctx.fillStyle = color;
     ctx.fillText(label, 32, 74);
+    
+    ctx.restore();
 
     if (primaryFeedback) {
         const feedbackHeight = 90;
@@ -389,6 +403,11 @@ function renderPostureOverlay(ctx, width, height, analysis) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
         fillRoundedRect(ctx, 16, yStart, width - 32, feedbackHeight, 12);
 
+        // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.translate(-width, 0);
+        
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '600 18px "Inter", Arial, sans-serif';
         ctx.fillText('Conseil posture', 32, yStart + 34);
@@ -396,15 +415,24 @@ function renderPostureOverlay(ctx, width, height, analysis) {
         ctx.font = '400 15px "Inter", Arial, sans-serif';
         const message = primaryFeedback.message.replace(/^[⚠️💡✓ ]+/g, '');
         wrapCanvasText(ctx, message, 32, yStart + 60, width - 64, 22);
+        
+        ctx.restore();
     } else {
         const tipHeight = 58;
         const yStart = height - tipHeight - 24;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         fillRoundedRect(ctx, 16, yStart, 210, tipHeight, 10);
 
+        // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.translate(-width, 0);
+        
         ctx.fillStyle = '#2ecc71';
         ctx.font = '600 16px "Inter", Arial, sans-serif';
         ctx.fillText('✓ Posture stable', 32, yStart + 32);
+        
+        ctx.restore();
     }
 
     drawStatusIndicator(ctx, width, height, severity, color);
@@ -545,16 +573,83 @@ function triggerAutomaticStop(reason) {
         playSound('posture-error');
     }
     
-    // Arrêter la séance automatiquement
-    if (typeof stopWorkout === 'function') {
-        setTimeout(() => {
-            stopWorkout();
-            alert(reason);
-        }, 2000); // Attendre 2 secondes pour que l'utilisateur voie le message
-    }
+    // Créer et afficher un modal personnalisé
+    showPostureWarningModal(reason);
     
     // Marquer que l'avertissement a été affiché
     highRiskWarningShown = true;
+}
+
+// Fonction pour afficher le modal d'avertissement postural
+function showPostureWarningModal(reason) {
+    // Vérifier si le modal existe déjà
+    let modal = document.getElementById('posture-warning-modal');
+    
+    if (!modal) {
+        // Créer le modal s'il n'existe pas
+        modal = document.createElement('div');
+        modal.id = 'posture-warning-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content modal-small">
+                <div style="padding: 1.5rem;">
+                    <h3 style="color: var(--danger-color); margin-bottom: 1rem; font-size: 1.25rem;">⚠️ Avertissement</h3>
+                    <p id="posture-warning-message" style="margin-bottom: 1.5rem; line-height: 1.6; color: var(--text-color);">${reason}</p>
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button id="posture-warning-continue" class="btn-primary" style="min-width: 120px;">Continuer</button>
+                        <button id="posture-warning-close" class="btn-secondary" style="min-width: 120px;">Fermer</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Gérer le bouton "Continuer"
+        const continueBtn = document.getElementById('posture-warning-continue');
+        if (continueBtn) {
+            continueBtn.addEventListener('click', () => {
+                // Fermer le modal
+                modal.style.display = 'none';
+                modal.classList.remove('active');
+                
+                // L'utilisateur peut continuer la séance
+                console.log('L\'utilisateur a choisi de continuer malgré l\'avertissement');
+            });
+        }
+        
+        // Gérer le bouton "Fermer"
+        const closeBtn = document.getElementById('posture-warning-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                // Fermer le modal
+                modal.style.display = 'none';
+                modal.classList.remove('active');
+                
+                // Arrêter la séance
+                if (typeof stopWorkout === 'function') {
+                    stopWorkout();
+                }
+            });
+        }
+        
+        // Fermer le modal si on clique en dehors
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                modal.classList.remove('active');
+            }
+        });
+    }
+    
+    // Mettre à jour le message
+    const messageEl = document.getElementById('posture-warning-message');
+    if (messageEl) {
+        messageEl.textContent = reason;
+    }
+    
+    // Afficher le modal
+    modal.style.display = 'flex';
+    modal.classList.add('active');
 }
 
 // Mettre à jour l'indicateur de score postural (FR-10)
@@ -604,8 +699,7 @@ function displayPostureFeedback(feedback, postureScore = null) {
     }
 
     if (feedback.length === 0) {
-        const scoreDisplay = postureScore !== null ? ` <span style="color: var(--primary-color); font-weight: bold;">(${postureScore}/100)</span>` : '';
-        feedbackBox.innerHTML = `<p style="color: green;">✓ Posture correcte${scoreDisplay}</p>`;
+        feedbackBox.innerHTML = `<p style="color: green;">✓ Posture correcte</p>`;
         feedbackBox.className = 'feedback-box';
     } else {
         const errorFeedback = feedback.find(f => f.type === 'error' || f.severity === 'high');
@@ -614,23 +708,14 @@ function displayPostureFeedback(feedback, postureScore = null) {
         let html = '';
         if (errorFeedback) {
             html = `<p style="font-weight: bold;">${errorFeedback.message}</p>`;
-            if (postureScore !== null) {
-                html += `<p style="font-size: 0.9rem; margin-top: 0.5rem;">Score: ${postureScore}/100</p>`;
-            }
             feedbackBox.innerHTML = html;
             feedbackBox.className = 'feedback-box error';
         } else if (warningFeedback) {
             html = `<p>${warningFeedback.message}</p>`;
-            if (postureScore !== null) {
-                html += `<p style="font-size: 0.9rem; margin-top: 0.5rem;">Score: ${postureScore}/100</p>`;
-            }
             feedbackBox.innerHTML = html;
             feedbackBox.className = 'feedback-box warning';
         } else {
             html = feedback.map(f => `<p>${f.message}</p>`).join('');
-            if (postureScore !== null) {
-                html += `<p style="font-size: 0.9rem; margin-top: 0.5rem;">Score: ${postureScore}/100</p>`;
-            }
             feedbackBox.innerHTML = html;
             feedbackBox.className = 'feedback-box';
         }
