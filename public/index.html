@@ -722,11 +722,23 @@
                 </div>
                 <div class="eval-controls">
                     <button id="btn-start-eval" class="btn-primary">Commencer l'évaluation</button>
-                    <button id="btn-eval-prev" class="btn-secondary hidden">Précédent</button>
-                    <button id="btn-eval-pause" class="btn-secondary hidden">Pause</button>
-                    <button id="btn-eval-skip" class="btn-secondary hidden">Passer</button>
+                    <button id="btn-eval-prev" class="btn-secondary hidden">
+                        <span class="btn-icon">◀</span>
+                        <span class="btn-text">Précédent</span>
+                    </button>
+                    <button id="btn-eval-pause" class="btn-secondary hidden">
+                        <span class="btn-icon">⏸</span>
+                        <span class="btn-text">Pause</span>
+                    </button>
+                    <button id="btn-eval-skip" class="btn-secondary hidden">
+                        <span class="btn-icon">▶</span>
+                        <span class="btn-text">Passer</span>
+                    </button>
                     <button id="btn-next-exercise" class="btn-primary hidden">Exercice suivant</button>
-                    <button id="btn-finish-eval" class="btn-primary hidden">Terminer</button>
+                    <button id="btn-finish-eval" class="btn-danger hidden">
+                        <span class="btn-icon">⏹</span>
+                        <span class="btn-text">Arrêter</span>
+                    </button>
                     <button id="btn-cancel-eval" class="btn-secondary hidden">Annuler</button>
                     <button id="btn-generate-plan-after-eval" class="btn-primary hidden">Générer le plan d'entraînement</button>
                     <button id="btn-restart-eval" class="btn-secondary hidden">Recommencer l'évaluation</button>

@@ -998,7 +998,9 @@ async function startPostureEvaluation() {
     if (btnRestart) btnRestart.classList.add('hidden');
     if (btnPause) {
         btnPause.classList.remove('hidden');
-        btnPause.textContent = 'Pause';
+        const btnText = btnPause.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'Pause';
+        else btnPause.textContent = 'Pause';
     }
     if (btnPrev) btnPrev.classList.add('hidden');
     if (btnSkip) btnSkip.classList.remove('hidden');
@@ -1138,7 +1140,9 @@ function startEvalExercise() {
     }
     if (btnPause) {
         btnPause.classList.remove('hidden');
-        btnPause.textContent = 'Pause';
+        const btnText = btnPause.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'Pause';
+        else btnPause.textContent = 'Pause';
     }
     if (btnPrev) btnPrev.classList.toggle('hidden', evalCurrentExercise === 0);
     if (btnSkip) btnSkip.classList.remove('hidden');
@@ -1413,7 +1417,11 @@ function completeCurrentEvalExercise(options = {}) {
     }
 
     const btnPause = document.getElementById('btn-eval-pause');
-    if (btnPause) btnPause.textContent = 'Pause';
+    if (btnPause) {
+        const btnText = btnPause.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'Pause';
+        else btnPause.textContent = 'Pause';
+    }
 
     evalPaused = false;
     evalPauseAccumulated = 0;
@@ -1423,14 +1431,18 @@ function toggleEvalPause() {
     const btnPause = document.getElementById('btn-eval-pause');
     if (!btnPause) return;
 
+    const btnText = btnPause.querySelector('.btn-text');
+    
     if (!evalPaused) {
         evalPaused = true;
         evalPauseAccumulated += Date.now() - evalStartTime;
-        btnPause.textContent = 'Reprendre';
+        if (btnText) btnText.textContent = 'Reprendre';
+        else btnPause.textContent = 'Reprendre';
     } else {
         evalPaused = false;
         evalStartTime = Date.now();
-        btnPause.textContent = 'Pause';
+        if (btnText) btnText.textContent = 'Pause';
+        else btnPause.textContent = 'Pause';
     }
 }
 

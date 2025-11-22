@@ -846,6 +846,12 @@ body.dark-mode .quick-action small {
     overflow: hidden;
 }
 
+/* Augmenter la hauteur de la vidéo pour l'évaluation posturale */
+#posture-eval-page .video-container {
+    aspect-ratio: 4 / 3;
+    min-height: 400px;
+}
+
 .video-container video,
 .workout-video-container video {
     position: absolute;
@@ -1503,6 +1509,51 @@ body.dark-mode .quick-action small {
     justify-content: center;
     margin-top: 1rem;
     flex-wrap: wrap;
+}
+
+/* Styles pour les icônes et texte des boutons */
+.eval-controls button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.eval-controls .btn-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.eval-controls .btn-text {
+    display: inline;
+}
+
+/* Sur mobile, masquer le texte et afficher uniquement les icônes */
+@media (max-width: 768px) {
+    #posture-eval-page .video-container {
+        aspect-ratio: 3 / 4;
+        min-height: 500px;
+    }
+    
+    .eval-controls {
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+    }
+    
+    .eval-controls button {
+        width: 100%;
+        padding: 1rem;
+        min-height: 50px;
+    }
+    
+    .eval-controls .btn-text {
+        display: none;
+    }
+    
+    .eval-controls .btn-icon {
+        font-size: 1.5rem;
+    }
 }
 
 /* Catalogue d'exercices */
