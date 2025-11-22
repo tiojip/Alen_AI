@@ -1444,55 +1444,102 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
                             (extendedProfile?.injury_history?.toLowerCase().includes('épaule'));
   
   // Sélectionner les exercices de base selon le niveau
-  let selectedExercises = [...EXERCISE_DATABASE[level] || EXERCISE_DATABASE.beginner];
+  let selectedExercises = [...(EXERCISE_DATABASE[level] || EXERCISE_DATABASE.beginner)];
+  
+  // S'assurer qu'on a des exercices de base
+  if (!selectedExercises || selectedExercises.length === 0) {
+    console.warn(`Aucun exercice trouvé pour le niveau ${level}, utilisation du niveau débutant`);
+    selectedExercises = [...EXERCISE_DATABASE.beginner];
+  }
   
   // Filtrer selon l'équipement disponible
-  if (availableEquipment) {
-    const hasMat = availableEquipment.includes('tapis') || availableEquipment.includes('mat');
-    const hasChair = availableEquipment.includes('chaise') || availableEquipment.includes('chair');
-    const hasWeights = availableEquipment.includes('haltère') || availableEquipment.includes('weight');
-    const hasBands = availableEquipment.includes('bande') || availableEquipment.includes('élastique');
+  if (availableEquipment && availableEquipment.trim() !== '' && availableEquipment.toLowerCase() !== 'aucun') {
+    const availableLower = availableEquipment.toLowerCase();
+    const hasMat = availableLower.includes('tapis') || availableLower.includes('mat');
+    const hasChair = availableLower.includes('chaise') || availableLower.includes('chair');
+    const hasWeights = availableLower.includes('haltère') || availableLower.includes('weight') || availableLower.includes('dumbbell');
+    const hasBands = availableLower.includes('bande') || availableLower.includes('élastique') || availableLower.includes('resistance');
     
-    selectedExercises = selectedExercises.filter(ex => {
+    const filtered = selectedExercises.filter(ex => {
       if (ex.equipment === 'mat' && !hasMat) return false;
       if (ex.equipment === 'chair' && !hasChair) return false;
       if (ex.equipment === 'weights' && !hasWeights) return false;
       if (ex.equipment === 'bands' && !hasBands) return false;
       return true;
     });
+    
+    // Si le filtrage a supprimé tous les exercices, garder ceux sans matériel
+    if (filtered.length > 0) {
+      selectedExercises = filtered;
+    } else {
+      console.warn('Filtrage par équipement a supprimé tous les exercices, utilisation des exercices sans matériel');
+      selectedExercises = selectedExercises.filter(ex => ex.equipment === 'none' || ex.equipment === 'mat');
+      // Si toujours vide, utiliser tous les exercices
+      if (selectedExercises.length === 0) {
+        selectedExercises = [...EXERCISE_DATABASE.beginner];
+      }
+    }
   } else {
-    // Si pas d'équipement spécifié, privilégier sans matériel
-    selectedExercises = selectedExercises.filter(ex => ex.equipment === 'none' || ex.equipment === 'mat');
+    // Si pas d'équipement spécifié, privilégier sans matériel mais garder tous les exercices disponibles
+    const noEquipment = selectedExercises.filter(ex => ex.equipment === 'none' || ex.equipment === 'mat');
+    if (noEquipment.length >= 3) {
+      selectedExercises = noEquipment;
+    }
+    // Sinon garder tous les exercices disponibles
   }
   
-  // Filtrer selon les contraintes/blessures
+  // S'assurer qu'on a au moins quelques exercices
+  if (selectedExercises.length === 0) {
+    console.warn('Aucun exercice après filtrage, utilisation des exercices par défaut');
+    selectedExercises = [...EXERCISE_DATABASE.beginner];
+  }
+  
+  // Filtrer selon les contraintes/blessures (avec vérification pour ne pas tout supprimer)
   if (hasBackPain) {
+    const beforeFilter = selectedExercises.length;
     selectedExercises = selectedExercises.filter(ex => 
       !ex.name.toLowerCase().includes('squat') && 
       !ex.name.toLowerCase().includes('fente') &&
       !ex.muscles.some(m => m.toLowerCase().includes('dos'))
     );
+    // Si trop d'exercices ont été supprimés, garder au moins la moitié
+    if (selectedExercises.length < beforeFilter * 0.3) {
+      console.warn('Filtre dos a supprimé trop d\'exercices, réduction du filtre');
+      selectedExercises = selectedExercises.slice(0, Math.max(selectedExercises.length, 3));
+    }
     // Ajouter des exercices adaptés
     selectedExercises.push({ name: 'Pont', sets: 3, reps: 10, rest: 60, muscles: ['Fessiers'], equipment: 'mat', difficulty: 1 });
   }
   
   if (hasKneeIssues) {
+    const beforeFilter = selectedExercises.length;
     selectedExercises = selectedExercises.filter(ex => 
       !ex.name.toLowerCase().includes('squat') && 
       !ex.name.toLowerCase().includes('fente') &&
       !ex.name.toLowerCase().includes('burpee') &&
       !ex.muscles.some(m => m.toLowerCase().includes('genou'))
     );
+    // Si trop d'exercices ont été supprimés, garder au moins la moitié
+    if (selectedExercises.length < beforeFilter * 0.3) {
+      console.warn('Filtre genou a supprimé trop d\'exercices, réduction du filtre');
+      selectedExercises = selectedExercises.slice(0, Math.max(selectedExercises.length, 3));
+    }
     // Ajouter des exercices adaptés
     selectedExercises.push({ name: 'Extensions de jambes assis', sets: 3, reps: 12, rest: 45, muscles: ['Quadriceps'], equipment: 'chair', difficulty: 1 });
   }
   
   if (hasShoulderIssues) {
+    const beforeFilter = selectedExercises.length;
     selectedExercises = selectedExercises.filter(ex => 
       !ex.name.toLowerCase().includes('push-up') &&
       !ex.name.toLowerCase().includes('pompe') &&
       !ex.muscles.some(m => m.toLowerCase().includes('épaule') || m.toLowerCase().includes('pectoraux'))
     );
+    // Si trop d'exercices ont été supprimés, garder au moins la moitié
+    if (selectedExercises.length < beforeFilter * 0.3) {
+      console.warn('Filtre épaule a supprimé trop d\'exercices, réduction du filtre');
+      selectedExercises = selectedExercises.slice(0, Math.max(selectedExercises.length, 3));
+    }
   }
 
   if (computedBmi && computedBmi >= 30) {
@@ -1524,9 +1571,15 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     }));
   }
 
-  if (techniqueLevel.includes('début') || techniqueLevel.includes('novice')) {
+  if (techniqueLevel && (techniqueLevel.includes('début') || techniqueLevel.includes('novice'))) {
     notes.push('Exercices sélectionnés avec une technique accessible pour renforcer les bases.');
+    const beforeFilter = selectedExercises.length;
     selectedExercises = selectedExercises.filter(ex => (ex.difficulty || 2) <= 3);
+    // Si trop d'exercices ont été supprimés, garder au moins la moitié
+    if (selectedExercises.length < beforeFilter * 0.5) {
+      console.warn('Filtre technique a supprimé trop d\'exercices, réduction du filtre');
+      selectedExercises = selectedExercises.slice(0, Math.max(selectedExercises.length, 3));
+    }
   }
 
   if (timeSinceLastTraining && /mois|ans|année/.test(timeSinceLastTraining.toLowerCase())) {
@@ -1580,6 +1633,12 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     notes.push(`Sensibilité des alertes réglée sur ${alertSensitivity}/10 pour vos retours posturaux.`);
   }
 
+  // Vérification finale : s'assurer qu'on a toujours des exercices après tous les filtres
+  if (!selectedExercises || selectedExercises.length === 0) {
+    console.error('ERREUR CRITIQUE: Tous les exercices ont été filtrés, utilisation des exercices par défaut');
+    selectedExercises = [...EXERCISE_DATABASE.beginner];
+  }
+
   // Appliquer les ajustements d'intensité cumulés
   if (intensityAdjustments.includes('reduce')) {
     selectedExercises = selectedExercises.map(ex => ({
@@ -1588,6 +1647,14 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
       rest: Math.min((ex.rest || 60) + 10, 120)
     }));
   }
+  
+  // Vérification finale après ajustements
+  if (!selectedExercises || selectedExercises.length === 0) {
+    console.error('ERREUR CRITIQUE: Plus d\'exercices après ajustements, utilisation des exercices par défaut');
+    selectedExercises = [...EXERCISE_DATABASE.beginner];
+  }
+  
+  console.log(`Exercices sélectionnés après tous les filtres: ${selectedExercises.length} exercices`);
   
   // Adapter la durée selon les préférences
   const targetSessionDuration = preferredDuration * 60; // en secondes
@@ -1624,7 +1691,28 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     targetSessions = 3;
   }
 
+  // S'assurer qu'on a des exercices avant de générer le plan
+  if (!selectedExercises || selectedExercises.length === 0) {
+    console.error('ERREUR: Aucun exercice sélectionné avant génération du plan hebdomadaire');
+    selectedExercises = [...EXERCISE_DATABASE.beginner];
+  }
+  
+  console.log(`Génération plan: ${selectedExercises.length} exercices sélectionnés pour niveau ${level}`);
+  
   const weeklyPlan = generateWeeklySchedule(selectedExercises, weeklyAvailability, preferredDuration, targetSessions);
+  
+  // Vérifier que le plan généré contient des exercices
+  const totalExercises = Object.values(weeklyPlan).reduce((sum, dayExercises) => {
+    return sum + (Array.isArray(dayExercises) ? dayExercises.length : 0);
+  }, 0);
+  
+  if (totalExercises === 0) {
+    console.error('ERREUR: Plan hebdomadaire généré sans exercices, utilisation du plan par défaut');
+    weeklyPlan.monday = selectedExercises.slice(0, Math.ceil(selectedExercises.length / 2));
+    weeklyPlan.wednesday = selectedExercises.slice(Math.ceil(selectedExercises.length / 2));
+  }
+  
+  console.log(`Plan généré: ${Object.keys(weeklyPlan).length} jours avec ${totalExercises} exercices au total`);
   
   // Version du plan (pour traçabilité FR-06)
   const planVersion = `1.0.${Date.now()}`;
@@ -1928,21 +2016,46 @@ function generateWeeklySchedule(exercises, availability, preferredDuration, targ
     selectedDays.push(nextDay);
   }
   
+  // S'assurer qu'il y a des exercices à répartir
+  if (!exercises || exercises.length === 0) {
+    console.warn('Aucun exercice à répartir, utilisation des exercices par défaut');
+    // Utiliser des exercices par défaut si la liste est vide
+    const defaultExercises = EXERCISE_DATABASE.beginner || [
+      { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 },
+      { name: 'Push-ups (genoux)', sets: 2, reps: 8, rest: 60, muscles: ['Pectoraux'], equipment: 'none', difficulty: 1 },
+      { name: 'Planche', sets: 3, duration: 20, rest: 60, muscles: ['Abdominaux'], equipment: 'mat', difficulty: 2 }
+    ];
+    exercises = defaultExercises;
+  }
+  
   // Répartir les exercices sur les jours disponibles
   const exercisesPerDay = Math.ceil(exercises.length / selectedDays.length);
   
   selectedDays.forEach((day, index) => {
     const start = index * exercisesPerDay;
     const end = Math.min(start + exercisesPerDay, exercises.length);
-    weeklyPlan[day] = exercises.slice(start, end);
+    const dayExercises = exercises.slice(start, end);
+    // S'assurer qu'il y a au moins un exercice par jour
+    if (dayExercises.length > 0) {
+      weeklyPlan[day] = dayExercises;
+    }
   });
   
   // S'assurer qu'il y a au moins un jour avec des exercices
   if (Object.keys(weeklyPlan).length === 0) {
-    weeklyPlan.monday = exercises;
-    weeklyPlan.wednesday = exercises;
-    weeklyPlan.friday = exercises;
+    console.warn('Aucun jour avec exercices, création d\'un plan par défaut');
+    weeklyPlan.monday = exercises.slice(0, Math.ceil(exercises.length / 3));
+    weeklyPlan.wednesday = exercises.slice(Math.ceil(exercises.length / 3), Math.ceil(exercises.length * 2 / 3));
+    weeklyPlan.friday = exercises.slice(Math.ceil(exercises.length * 2 / 3));
   }
+  
+  // S'assurer que chaque jour a au moins un exercice
+  Object.keys(weeklyPlan).forEach(day => {
+    if (!weeklyPlan[day] || weeklyPlan[day].length === 0) {
+      // Si un jour est vide, lui donner au moins un exercice
+      weeklyPlan[day] = [exercises[0] || EXERCISE_DATABASE.beginner[0]];
+    }
+  });
   
   return weeklyPlan;
 }

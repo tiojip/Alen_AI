@@ -32,7 +32,19 @@ async function loadDashboard() {
                     // Utiliser userProfile déjà chargé au début de la fonction
                     const fitnessLevel = userProfile?.fitness_level || plan.level || 'beginner';
                     const goals = userProfile?.goals || plan.goals || 'general';
-                    const duration = plan.duration || '4 weeks';
+                    
+                    // Récupérer la durée préférée depuis le profil étendu si disponible
+                    let duration = plan.duration || '4 weeks';
+                    try {
+                        const extendedProfile = await api.getExtendedProfile().catch(() => null);
+                        if (extendedProfile && extendedProfile.preferred_session_duration) {
+                            duration = `${extendedProfile.preferred_session_duration} minutes par séance`;
+                        } else if (plan.metadata && plan.metadata.preferredDuration) {
+                            duration = `${plan.metadata.preferredDuration} minutes par séance`;
+                        }
+                    } catch (error) {
+                        console.warn('Impossible de charger le profil étendu pour la durée:', error);
+                    }
                     
                     // Utiliser les fonctions de formatage si disponibles, sinon formater manuellement
                     let levelLabel, formattedGoals, formattedDuration;

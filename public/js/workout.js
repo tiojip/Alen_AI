@@ -278,8 +278,14 @@ async function displayWorkoutPlan(plan) {
     goals = userProfile?.goals || plan.goals || plan.metadata?.primaryGoals || 'general';
     
     // Récupérer la durée
-    // Priorité: plan.duration > plan.metadata.duration > défaut
-    duration = plan.duration || plan.metadata?.duration || '4 weeks';
+    // Priorité: durée préférée du profil étendu > plan.duration > plan.metadata.duration > plan.metadata.preferredDuration > défaut
+    if (extendedProfile && extendedProfile.preferred_session_duration) {
+      duration = `${extendedProfile.preferred_session_duration} minutes par séance`;
+    } else if (plan.metadata && plan.metadata.preferredDuration) {
+      duration = `${plan.metadata.preferredDuration} minutes par séance`;
+    } else {
+      duration = plan.duration || plan.metadata?.duration || '4 weeks';
+    }
     
     // Log pour debug (peut être retiré en production)
     console.log('Affichage plan - Données récupérées:', {
@@ -287,7 +293,23 @@ async function displayWorkoutPlan(plan) {
         goals,
         duration,
         hasUserProfile: !!userProfile,
-        hasExtendedProfile: !!extendedProfile
+        hasExtendedProfile: !!extendedProfile,
+        userProfileData: userProfile ? {
+            fitness_level: userProfile.fitness_level,
+            goals: userProfile.goals,
+            name: userProfile.name
+        } : null,
+        extendedProfileData: extendedProfile ? {
+            preferred_session_duration: extendedProfile.preferred_session_duration,
+            weekly_availability: extendedProfile.weekly_availability
+        } : null,
+        planData: {
+            level: plan.level,
+            goals: plan.goals,
+            duration: plan.duration,
+            weeklyPlanDays: plan.weeklyPlan ? Object.keys(plan.weeklyPlan).length : 0,
+            totalExercises: plan.weeklyPlan ? Object.values(plan.weeklyPlan).reduce((sum, ex) => sum + (Array.isArray(ex) ? ex.length : 0), 0) : 0
+        }
     });
 
     // Charger le catalogue d'exercices pour les GIFs

@@ -24,9 +24,9 @@ function resetConsentState() {
 async function isProfileComplete() {
     try {
         const profile = await api.getProfile();
-        // Vérifier les champs essentiels
+        // Vérifier les champs essentiels (utiliser birthdate au lieu de age)
         return !!(
-            profile.age &&
+            (profile.birthdate || profile.age) &&
             profile.weight &&
             profile.height &&
             profile.fitness_level &&
@@ -163,15 +163,29 @@ function showLogin() {
         return;
     }
     
-    // Afficher la page de login
-    loginPage.style.display = 'flex';
-    loginPage.classList.add('active');
-    
     // Masquer complètement l'application
     appContainer.classList.add('hidden');
     appContainer.style.display = 'none';
+    appContainer.style.setProperty('display', 'none', 'important');
     
+    // Afficher la page de login
+    loginPage.style.display = 'flex';
+    loginPage.style.setProperty('display', 'flex', 'important');
+    loginPage.classList.add('active');
+    loginPage.classList.remove('hidden');
+    
+    // Masquer toutes les pages de l'application
     hideAllPages();
+    
+    // Réinitialiser l'état du workflow
+    isNewUser = false;
+    
+    // Nettoyer les messages de workflow s'ils existent
+    const workflowMessage = document.getElementById('workflow-message');
+    if (workflowMessage) {
+        workflowMessage.remove();
+    }
+    
     console.log('Page de login affichée');
 }
 
@@ -573,20 +587,44 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('nav-exercises')?.addEventListener('click', () => showPage('exercises-catalog'));
     document.getElementById('nav-profile').addEventListener('click', () => showPage('profile'));
     document.getElementById('nav-logout').addEventListener('click', () => {
+        console.log('Déconnexion demandée');
+        
+        // Afficher un avertissement de confirmation
+        const confirmed = confirm('Êtes-vous sûr de vouloir vous déconnecter ?\n\nVous devrez vous reconnecter pour accéder à nouveau à votre compte.');
+        
+        // Si l'utilisateur annule, ne rien faire
+        if (!confirmed) {
+            console.log('Déconnexion annulée par l\'utilisateur');
+            return;
+        }
+        
+        console.log('Déconnexion confirmée par l\'utilisateur');
+        
         // Nettoyer toutes les données utilisateur
         api.logout();
         currentUser = null;
+        isNewUser = false;
         
-        // Nettoyer le localStorage (garder seulement les préférences non sensibles si nécessaire)
+        // Nettoyer complètement le localStorage
         localStorage.removeItem('token');
         localStorage.removeItem('userProfile');
+        localStorage.removeItem('extendedProfile');
         localStorage.removeItem('userPreferences');
+        localStorage.removeItem('workoutPlan');
+        localStorage.removeItem('consent-data');
+        localStorage.removeItem('consent-given');
         
         // Réinitialiser les formulaires de connexion/inscription
         const loginForm = document.getElementById('login-form');
         const registerForm = document.getElementById('register-form');
-        if (loginForm) loginForm.reset();
-        if (registerForm) registerForm.reset();
+        if (loginForm) {
+            loginForm.reset();
+            loginForm.classList.remove('hidden');
+        }
+        if (registerForm) {
+            registerForm.reset();
+            registerForm.classList.add('hidden');
+        }
         
         // Réinitialiser les onglets de connexion/inscription pour afficher "Connexion" par défaut
         const loginTab = document.querySelector('.tab-btn[data-tab="login"]');
@@ -598,19 +636,12 @@ document.addEventListener('DOMContentLoaded', () => {
             registerTab.classList.remove('active');
         }
         
-        // Afficher le formulaire de connexion et masquer celui d'inscription
-        if (loginForm) {
-            loginForm.classList.remove('hidden');
-        }
-        if (registerForm) {
-            registerForm.classList.add('hidden');
-        }
-        
         // Masquer tous les messages d'erreur
-        const errorMessages = document.querySelectorAll('.error-message');
+        const errorMessages = document.querySelectorAll('.error-message, .form-feedback, #auth-error');
         errorMessages.forEach(msg => {
-            msg.classList.remove('show');
+            msg.classList.remove('show', 'error');
             msg.textContent = '';
+            msg.innerHTML = '';
         });
         
         // Masquer le modal de réinitialisation de mot de passe s'il est ouvert
@@ -620,8 +651,30 @@ document.addEventListener('DOMContentLoaded', () => {
             passwordResetModal.classList.remove('active');
         }
         
+        // Masquer le modal de consentement s'il est ouvert
+        const consentModal = document.getElementById('consent-modal');
+        if (consentModal) {
+            consentModal.classList.remove('active');
+            consentModal.style.display = 'none';
+        }
+        
+        // Nettoyer l'état du consentement
+        resetConsentState();
+        
+        // Masquer le menu de navigation mobile s'il est ouvert
+        const navLinks = document.querySelector('.nav-links');
+        const navToggle = document.querySelector('.nav-toggle');
+        if (navLinks) {
+            navLinks.classList.remove('open');
+        }
+        if (navToggle) {
+            navToggle.classList.remove('open');
+        }
+        
         // Afficher la page de connexion
         showLogin();
+        
+        console.log('Déconnexion terminée, retour à la page de connexion');
     });
 
     // Initialisation

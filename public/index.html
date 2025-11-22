@@ -263,23 +263,25 @@
                 <h3>Informations personnelles</h3>
                 <form id="profile-form">
                     <div class="form-group">
-                        <label>Nom</label>
-                        <input type="text" id="profile-name">
+                        <label for="profile-name">Nom</label>
+                        <input type="text" id="profile-name" placeholder="Votre nom complet">
+                    </div>
+                    <div class="form-group form-group-date">
+                        <label for="profile-birthdate">Date de naissance</label>
+                        <input type="date" id="profile-birthdate" max="" class="date-input">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="profile-weight">Poids (kg)</label>
+                            <input type="number" id="profile-weight" step="0.1" min="1" placeholder="Ex: 70.5">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-height">Taille (cm)</label>
+                            <input type="number" id="profile-height" min="1" placeholder="Ex: 175">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>Date de naissance</label>
-                        <input type="date" id="profile-birthdate" max="">
-                    </div>
-                    <div class="form-group">
-                        <label>Poids (kg)</label>
-                        <input type="number" id="profile-weight" step="0.1" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Taille (cm)</label>
-                        <input type="number" id="profile-height" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Niveau de forme</label>
+                        <label for="profile-level">Niveau de forme</label>
                         <select id="profile-level">
                             <option value="beginner">Débutant</option>
                             <option value="intermediate">Intermédiaire</option>
@@ -287,12 +289,12 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Objectifs</label>
-                        <textarea id="profile-goals" rows="3"></textarea>
+                        <label for="profile-goals">Objectifs</label>
+                        <textarea id="profile-goals" rows="3" placeholder="Décrivez vos objectifs (ex: perdre du poids, prendre de la masse, améliorer l'endurance...)"></textarea>
                     </div>
                     <div class="form-group">
-                        <label>Contraintes physiques</label>
-                        <textarea id="profile-constraints" rows="3"></textarea>
+                        <label for="profile-constraints">Contraintes physiques</label>
+                        <textarea id="profile-constraints" rows="3" placeholder="Indiquez vos contraintes ou blessures (ex: problème de dos, genou, épaule...)"></textarea>
                     </div>
                 </form>
             </div>
