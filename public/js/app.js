@@ -603,23 +603,12 @@ async function loadProgress() {
     }
 }
 
-// Chat IA avec streaming (FR-14) et voice notes
+// Chat IA avec streaming (FR-14)
 function initChat() {
     const chatMessages = document.getElementById('chat-messages');
     const chatInput = document.getElementById('chat-input');
     const btnSend = document.getElementById('btn-send-chat');
-    const btnVoiceRecord = document.getElementById('btn-voice-record');
-    const voiceIndicator = document.getElementById('voice-recording-indicator');
-    const voiceTimer = document.getElementById('voice-timer');
-    const btnStopRecording = document.getElementById('btn-stop-recording');
-    const btnSendVoice = document.getElementById('btn-send-voice');
-    
     let currentMessageDiv = null; // Pour le streaming (FR-14)
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let recordingStartTime = null;
-    let recordingTimer = null;
-    let isRecording = false;
 
     function addMessage(text, isUser, isStreaming = false) {
         const messageDiv = document.createElement('div');
@@ -779,127 +768,6 @@ function initChat() {
             sendMessage();
         }
     });
-
-    // Fonctions pour l'enregistrement vocal
-    async function startVoiceRecording() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-            
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunks.push(event.data);
-                }
-            };
-            
-            mediaRecorder.onstop = () => {
-                stream.getTracks().forEach(track => track.stop());
-            };
-            
-            mediaRecorder.start();
-            isRecording = true;
-            recordingStartTime = Date.now();
-            
-            // Afficher l'indicateur d'enregistrement
-            voiceIndicator.classList.remove('hidden');
-            btnVoiceRecord.classList.add('recording');
-            
-            // Démarrer le timer
-            recordingTimer = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-                const minutes = Math.floor(elapsed / 60);
-                const seconds = elapsed % 60;
-                voiceTimer.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            }, 1000);
-            
-        } catch (error) {
-            console.error('Erreur accès microphone:', error);
-            alert('Impossible d\'accéder au microphone. Veuillez autoriser l\'accès dans les paramètres de votre navigateur.');
-        }
-    }
-    
-    function stopVoiceRecording() {
-        if (mediaRecorder && isRecording) {
-            mediaRecorder.stop();
-            isRecording = false;
-            
-            // Arrêter le timer
-            if (recordingTimer) {
-                clearInterval(recordingTimer);
-                recordingTimer = null;
-            }
-            
-            // Garder l'indicateur visible pour permettre l'envoi
-            btnVoiceRecord.classList.remove('recording');
-        }
-    }
-    
-    async function sendVoiceMessage() {
-        if (!mediaRecorder || audioChunks.length === 0) {
-            alert('Aucun enregistrement disponible');
-            return;
-        }
-        
-        // Créer le blob audio
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        
-        // Afficher le message vocal dans le chat
-        addMessage('', true, false, audioBlob);
-        
-        // Cacher l'indicateur
-        voiceIndicator.classList.add('hidden');
-        audioChunks = [];
-        recordingStartTime = null;
-        if (recordingTimer) {
-            clearInterval(recordingTimer);
-            recordingTimer = null;
-        }
-        voiceTimer.textContent = '00:00';
-        
-        // Envoyer au serveur
-        try {
-            const formData = new FormData();
-            formData.append('audio', audioBlob, 'voice-message.webm');
-            formData.append('type', 'voice');
-            
-            const token = localStorage.getItem('token');
-            const API_BASE = ''; // Utiliser le même que dans api.js
-            const response = await fetch(`${API_BASE}/api/chat/voice`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-            
-            if (!response.ok) {
-                throw new Error('Erreur lors de l\'envoi du message vocal');
-            }
-            
-            const result = await response.json();
-            
-            // Afficher la réponse du coach
-            if (result.response) {
-                if (result.response.audioUrl) {
-                    // Réponse vocale
-                    addMessage('', false, false, null, result.response.audioUrl);
-                } else {
-                    // Réponse texte
-                    addMessage(result.response.text || result.response, false);
-                }
-            }
-            
-        } catch (error) {
-            console.error('Erreur envoi message vocal:', error);
-            addMessage('Erreur lors de l\'envoi du message vocal. Veuillez réessayer.', false);
-        }
-    }
-
-    // Gestion de l'enregistrement vocal
-    btnVoiceRecord.addEventListener('click', startVoiceRecording);
-    btnStopRecording.addEventListener('click', stopVoiceRecording);
-    btnSendVoice.addEventListener('click', sendVoiceMessage);
 
     // Message de bienvenue
     addMessage('Bonjour! Je suis Alen, votre coach virtuel. Comment puis-je vous aider aujourd\'hui?', false);

@@ -790,7 +790,35 @@ body.dark-mode .quick-action small {
     
     #notification-settings input[type="time"],
     #pref-notification-time {
-        max-width: 180px;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0.875rem 1rem;
+        font-size: 16px;
+        min-height: 48px;
+        max-height: 48px;
+        height: 48px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-color);
+        color: var(--text-color);
+        font-family: inherit;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        line-height: 1.5;
+        margin: 0;
+        cursor: pointer;
+    }
+    
+    #notification-settings input[type="time"]:focus,
+    #pref-notification-time:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+    }
+    
+    #notification-settings input[type="time"]:hover,
+    #pref-notification-time:hover {
+        border-color: var(--primary-color);
     }
     
     .checkbox-group {
@@ -854,6 +882,19 @@ body.dark-mode .quick-action small {
     
     .availability-day,
     .notification-day {
+        width: 12px !important;
+        height: 12px !important;
+        min-width: 12px !important;
+        min-height: 12px !important;
+        cursor: pointer;
+        accent-color: var(--primary-color);
+        flex-shrink: 0;
+    }
+    
+    /* Réduire les checkboxes de préférences (Mode sombre, Sons, Notifications) sur mobile */
+    #preferences-form .form-group label input[type="checkbox"],
+    #preferences-form label input[type="checkbox"],
+    .form-group label input[type="checkbox"]:not(.goal-checkbox):not(.constraint-checkbox):not(.availability-day):not(.notification-day) {
         width: 12px !important;
         height: 12px !important;
         min-width: 12px !important;
@@ -1349,10 +1390,35 @@ body.dark-mode .quick-action small {
 @media (max-width: 600px) {
     #notification-settings input[type="time"],
     #pref-notification-time {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0.875rem 1rem;
         font-size: 16px;
         min-height: 48px;
         max-height: 48px;
         height: 48px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-color);
+        color: var(--text-color);
+        font-family: inherit;
+        transition: all 0.3s ease;
+        box-sizing: border-box;
+        line-height: 1.5;
+        margin: 0;
+        cursor: pointer;
+    }
+    
+    #notification-settings input[type="time"]:focus,
+    #pref-notification-time:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+    }
+    
+    #notification-settings input[type="time"]:hover,
+    #pref-notification-time:hover {
+        border-color: var(--primary-color);
     }
 }
 
@@ -3564,70 +3630,16 @@ label {
 .chat-input-container {
     display: flex;
     gap: 0.5rem;
-    align-items: center;
-    padding: 0.5rem;
-    background: var(--bg-color);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-}
-
-.btn-voice {
-    background: var(--bg-secondary);
-    border: 2px solid var(--border-color);
-    border-radius: 50%;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-    padding: 0;
-}
-
-.btn-voice:hover {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    transform: scale(1.05);
-}
-
-.btn-voice.recording {
-    background: #f44336;
-    border-color: #f44336;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 0.8;
-    }
-}
-
-.voice-icon {
-    font-size: 1.25rem;
 }
 
 .chat-input-container input {
     flex: 1;
-    padding: 0.875rem 1rem;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
     font-size: 1rem;
-    background: var(--bg-color);
+    background: var(--card-bg);
     color: var(--text-color);
-    transition: all 0.3s ease;
-}
-
-.chat-input-container input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 
 .chat-input-container input:disabled {
@@ -3636,137 +3648,7 @@ label {
 }
 
 .chat-input-container button {
-    padding: 0.875rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-/* Indicateur d'enregistrement vocal */
-.voice-recording-indicator {
-    margin-top: 0.75rem;
-    padding: 1rem;
-    background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.05));
-    border: 2px solid #f44336;
-    border-radius: 8px;
-    animation: slideDown 0.3s ease;
-}
-
-.voice-recording-indicator.hidden {
-    display: none;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.voice-recording-content {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.voice-pulse {
-    width: 12px;
-    height: 12px;
-    background: #f44336;
-    border-radius: 50%;
-    animation: pulseDot 1s infinite;
-}
-
-@keyframes pulseDot {
-    0%, 100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    50% {
-        opacity: 0.5;
-        transform: scale(1.3);
-    }
-}
-
-.voice-text {
-    flex: 1;
-    font-weight: 500;
-    color: var(--text-color);
-}
-
-.voice-timer {
-    font-family: 'Courier New', monospace;
-    font-weight: 600;
-    color: #f44336;
-    font-size: 1.1rem;
-    min-width: 50px;
-    text-align: center;
-}
-
-.btn-stop-voice,
-.btn-send-voice {
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
-}
-
-.btn-stop-voice {
-    background: #f44336;
-    color: white;
-}
-
-.btn-stop-voice:hover {
-    background: #d32f2f;
-    transform: translateY(-1px);
-}
-
-.btn-send-voice {
-    background: var(--primary-color);
-    color: white;
-}
-
-.btn-send-voice:hover {
-    background: #388e3c;
-    transform: translateY(-1px);
-}
-
-/* Messages vocaux */
-.voice-message-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.voice-message-label {
-    font-size: 0.85rem;
-    font-weight: 500;
-    opacity: 0.8;
-    margin-bottom: 0.25rem;
-}
-
-.voice-audio-player {
-    width: 100%;
-    max-width: 300px;
-    height: 32px;
-    border-radius: 4px;
-}
-
-.chat-message.user .voice-audio-player {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.chat-message.coach .voice-audio-player {
-    background: var(--bg-secondary);
+    padding: 0.75rem 1.5rem;
 }
 
 /* Suggestions rapides (FR-14) */
