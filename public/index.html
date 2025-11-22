@@ -1065,8 +1065,20 @@
                 <div class="card chat-container">
                     <div id="chat-messages" class="chat-messages"></div>
                     <div class="chat-input-container">
+                        <button id="btn-voice-record" class="btn-voice" title="Enregistrer un message vocal">
+                            <span class="voice-icon">🎤</span>
+                        </button>
                         <input type="text" id="chat-input" placeholder="Posez votre question...">
                         <button id="btn-send-chat" class="btn-primary">Envoyer</button>
+                    </div>
+                    <div id="voice-recording-indicator" class="voice-recording-indicator hidden">
+                        <div class="voice-recording-content">
+                            <span class="voice-pulse"></span>
+                            <span class="voice-text">Enregistrement en cours...</span>
+                            <span id="voice-timer" class="voice-timer">00:00</span>
+                            <button id="btn-stop-recording" class="btn-stop-voice">Arrêter</button>
+                            <button id="btn-send-voice" class="btn-send-voice">Envoyer</button>
+                        </div>
                     </div>
                 </div>
             </div>

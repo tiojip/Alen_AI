@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const fileUpload = require('express-fileupload');
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +19,11 @@ console.log(`Clé API OpenAI détectée : ${HAS_OPENAI_KEY ? 'oui' : 'non'}`);
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(fileUpload({
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  createParentPath: true
+}));
 
 // Headers de sécurité - CSP désactivée temporairement pour le développement
 // Pour réactiver en production, décommenter et ajuster selon les besoins
@@ -2606,6 +2612,52 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
     response: fallbackResponse, 
     source: 'fallback'
   });
+});
+
+// Endpoint pour les messages vocaux (FR-14)
+app.post('/api/chat/voice', authenticateToken, async (req, res) => {
+  try {
+    if (!req.files || !req.files.audio) {
+      return res.status(400).json({ error: 'Aucun fichier audio fourni' });
+    }
+
+    const audioFile = req.files.audio;
+    const uploadsDir = path.join(__dirname, 'uploads', 'voice');
+    
+    // Créer le dossier uploads s'il n'existe pas
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Générer un nom de fichier unique
+    const fileName = `voice_${req.user.id}_${Date.now()}.webm`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    // Sauvegarder le fichier
+    await audioFile.mv(filePath);
+
+    // Pour l'instant, on retourne une réponse texte
+    // TODO: Intégrer avec un service de transcription (Whisper API) et génération vocale
+    const userContext = await loadUserContext(req.user.id);
+    
+    // Simuler une réponse pour l'instant
+    // En production, vous devriez :
+    // 1. Transcrire l'audio avec Whisper API
+    // 2. Envoyer la transcription au chat
+    // 3. Optionnellement générer une réponse vocale avec TTS
+    
+    res.json({
+      success: true,
+      response: {
+        text: 'Message vocal reçu ! Pour l\'instant, je peux seulement répondre par texte. La transcription vocale sera bientôt disponible.',
+        audioUrl: null
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur traitement message vocal:', error);
+    res.status(500).json({ error: 'Erreur lors du traitement du message vocal' });
+  }
 });
 
 // Suggestions rapides alimentées par l'IA (FR-14 complément)
