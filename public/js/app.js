@@ -349,7 +349,7 @@ async function loadProfile() {
         // Remplir le formulaire de profil
         if (userProfile) {
             const nameInput = document.getElementById('profile-name');
-            const ageInput = document.getElementById('profile-age');
+            const birthdateInput = document.getElementById('profile-birthdate');
             const weightInput = document.getElementById('profile-weight');
             const heightInput = document.getElementById('profile-height');
             const levelSelect = document.getElementById('profile-level');
@@ -357,7 +357,22 @@ async function loadProfile() {
             const constraintsInput = document.getElementById('profile-constraints');
 
             if (nameInput && userProfile.name != null) nameInput.value = userProfile.name;
-            if (ageInput && userProfile.age != null) ageInput.value = userProfile.age;
+            // Gérer la date de naissance (convertir l'âge existant si nécessaire)
+            if (birthdateInput) {
+                if (userProfile.birthdate) {
+                    birthdateInput.value = userProfile.birthdate;
+                } else if (userProfile.age) {
+                    // Convertir l'âge en date de naissance approximative (1er janvier de l'année)
+                    const currentYear = new Date().getFullYear();
+                    const birthYear = currentYear - userProfile.age;
+                    birthdateInput.value = `${birthYear}-01-01`;
+                }
+            }
+            // Définir la date maximale (aujourd'hui)
+            if (birthdateInput) {
+                const today = new Date().toISOString().split('T')[0];
+                birthdateInput.setAttribute('max', today);
+            }
             if (weightInput && userProfile.weight != null) weightInput.value = userProfile.weight;
             if (heightInput && userProfile.height != null) heightInput.value = userProfile.height;
             if (levelSelect && userProfile.fitness_level) levelSelect.value = userProfile.fitness_level;
@@ -744,7 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return {
             name: sanitizeText(document.getElementById('profile-name').value),
-            age: parseIntOrNull(document.getElementById('profile-age').value),
+            birthdate: document.getElementById('profile-birthdate').value || null,
             weight: parseFloatOrNull(document.getElementById('profile-weight').value),
             height: parseIntOrNull(document.getElementById('profile-height').value),
             fitness_level: document.getElementById('profile-level').value,
@@ -815,6 +830,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 await loadExtendedProfile();
             }
 
+            // Recharger le dashboard pour mettre à jour les informations
+            await loadDashboard();
+
             if (typeof advanceWorkflow === 'function') {
                 setTimeout(() => {
                     advanceWorkflow();
@@ -824,6 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = 'Génération du plan...';
 
             const profile = await api.getProfile();
+            const extendedProfile = await api.getExtendedProfile().catch(() => null);
             const startTime = Date.now();
             const data = await api.generatePlan(profile);
             const generationTime = Date.now() - startTime;
@@ -846,7 +865,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 alert(`Profil enregistré et plan généré en ${generationTime}ms ! ${slaMet ? '✅' : '⚠️'}`);
-                loadDashboard();
+                // Recharger le dashboard pour afficher les nouvelles informations
+                await loadDashboard();
             }
         } catch (error) {
             console.error('Erreur sauvegarde profil complet:', error);

@@ -424,7 +424,34 @@ async function displayWorkoutPlan(plan) {
 window.displayWorkoutPlan = displayWorkoutPlan;
 
 async function startWorkoutSession(day) {
-    const plan = await loadWorkoutPlan();
+    let plan = await loadWorkoutPlan();
+    
+    // Si aucun plan n'est disponible, essayer d'en générer un
+    if (!plan || !plan.weeklyPlan) {
+        try {
+            // Récupérer le profil pour générer un plan personnalisé
+            const profile = await api.getProfile();
+            const extendedProfile = await api.getExtendedProfile().catch(() => null);
+            
+            // Générer un nouveau plan basé sur le profil
+            const planData = await api.generatePlan(profile);
+            if (planData && planData.plan) {
+                plan = planData.plan;
+                // Recharger l'affichage du plan
+                if (typeof displayWorkoutPlan === 'function') {
+                    await displayWorkoutPlan(plan);
+                }
+            } else {
+                alert('Impossible de générer un plan. Veuillez vérifier votre profil.');
+                return;
+            }
+        } catch (error) {
+            console.error('Erreur lors de la génération du plan:', error);
+            alert('Impossible de charger ou générer un plan. Veuillez réessayer.');
+            return;
+        }
+    }
+    
     let targetDayKey = day;
     let dayExercises = plan?.weeklyPlan ? plan.weeklyPlan[day] : null;
 
@@ -442,7 +469,7 @@ async function startWorkoutSession(day) {
     const exercises = normalizeExercises(dayExercises);
 
     if (!plan || exercises.length === 0) {
-        alert('Aucun plan disponible pour ce jour');
+        alert('Aucun exercice disponible pour ce jour. Veuillez générer un plan d\'entraînement.');
         return;
     }
 

@@ -130,6 +130,7 @@ function initDatabase() {
       password TEXT NOT NULL,
       name TEXT,
       age INTEGER,
+      birthdate TEXT,
       weight REAL,
       height REAL,
       fitness_level TEXT,
@@ -139,6 +140,31 @@ function initDatabase() {
       consent_version TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+    
+    // Migration: Ajouter la colonne birthdate si elle n'existe pas
+    db.run(`ALTER TABLE users ADD COLUMN birthdate TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('Erreur migration birthdate:', err);
+      } else if (!err) {
+        console.log('Colonne birthdate ajoutée avec succès');
+        // Migrer les données existantes: convertir age en birthdate approximative
+        db.all('SELECT id, age FROM users WHERE age IS NOT NULL AND birthdate IS NULL', [], (err, rows) => {
+          if (!err && rows && rows.length > 0) {
+            const currentYear = new Date().getFullYear();
+            rows.forEach(row => {
+              const birthYear = currentYear - row.age;
+              const birthdate = `${birthYear}-01-01`;
+              db.run('UPDATE users SET birthdate = ? WHERE id = ?', [birthdate, row.id], (updateErr) => {
+                if (updateErr) {
+                  console.error('Erreur migration birthdate pour utilisateur', row.id, ':', updateErr);
+                }
+              });
+            });
+            console.log(`Migration: ${rows.length} utilisateurs migrés de age vers birthdate`);
+          }
+        });
+      }
+    });
 
     // Table profil détaillé (FR-04)
     db.run(`CREATE TABLE IF NOT EXISTS user_profile_extended (
@@ -474,22 +500,45 @@ app.post('/api/auth/password-reset/confirm', (req, res) => {
 
 // Routes utilisateur
 app.get('/api/user/profile', authenticateToken, (req, res) => {
-  db.get('SELECT id, email, name, age, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+  db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
     [req.user.id], (err, user) => {
       if (err) {
         return res.status(500).json({ error: err.message });
+      }
+      // Calculer l'âge à partir de la date de naissance si disponible
+      if (user && user.birthdate && !user.age) {
+        const birthDate = new Date(user.birthdate);
+        const today = new Date();
+        let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--;
+        }
+        user.age = calculatedAge;
       }
       res.json(user);
     });
 });
 
 app.put('/api/user/profile', authenticateToken, (req, res) => {
-  const { name, age, weight, height, fitness_level, goals, constraints } = req.body;
+  const { name, age, birthdate, weight, height, fitness_level, goals, constraints } = req.body;
+  
+  // Calculer l'âge à partir de la date de naissance si fournie
+  let calculatedAge = age;
+  if (birthdate && !age) {
+    const birthDate = new Date(birthdate);
+    const today = new Date();
+    calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
+    }
+  }
   
   db.run(
-    `UPDATE users SET name = ?, age = ?, weight = ?, height = ?, 
+    `UPDATE users SET name = ?, age = ?, birthdate = ?, weight = ?, height = ?, 
      fitness_level = ?, goals = ?, constraints = ? WHERE id = ?`,
-    [name, age, weight, height, fitness_level, goals, constraints, req.user.id],
+    [name, calculatedAge, birthdate || null, weight, height, fitness_level, goals, constraints, req.user.id],
     (err) => {
       if (err) {
         return res.status(500).json({ error: err.message });
@@ -637,7 +686,7 @@ app.get('/api/user/data-export', authenticateToken, (req, res) => {
             id: user.id,
             email: user.email,
             name: user.name,
-            age: user.age,
+            age: calculateAge(user.birthdate, user.age),
             weight: user.weight,
             height: user.height,
             fitness_level: user.fitness_level,
@@ -690,7 +739,7 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
   try {
     // Récupérer le profil complet depuis la base de données pour garantir la personnalisation
     const userProfile = await new Promise((resolve, reject) => {
-      db.get('SELECT id, email, name, age, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+      db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
         [req.user.id], (err, profile) => {
         if (err) {
           console.error('Erreur récupération profil:', err);
@@ -719,7 +768,7 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
     // Log pour vérifier que les données sont bien récupérées
     console.log('Génération plan - Profil de base:', {
       name: profile.name,
-      age: profile.age,
+      age: calculateAge(profile.birthdate, profile.age),
       fitness_level: profile.fitness_level,
       goals: profile.goals,
       constraints: profile.constraints
@@ -761,7 +810,7 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
     
     try {
       fallbackProfile = await new Promise((resolve, reject) => {
-        db.get('SELECT id, email, name, age, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+        db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
           [req.user.id], (err, profile) => {
           if (err) {
             console.error('Erreur récupération profil pour fallback:', err);
@@ -1645,6 +1694,21 @@ function sanitizeContextObject(obj) {
   return result;
 }
 
+// Fonction utilitaire pour calculer l'âge à partir de la date de naissance
+function calculateAge(birthdate, fallbackAge = null) {
+  if (birthdate) {
+    const birthDate = new Date(birthdate);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
+    }
+    return calculatedAge;
+  }
+  return fallbackAge;
+}
+
 // Construire le contexte utilisateur pour l'IA (FR-06)
 function buildUserContext(profile = {}, extendedProfile = {}) {
   // Calculer l'IMC si disponible
@@ -1658,7 +1722,7 @@ function buildUserContext(profile = {}, extendedProfile = {}) {
   const context = {
     basicProfile: {
       name: profile.name || 'Utilisateur',
-      age: profile.age || null,
+      age: calculateAge(profile.birthdate, profile.age),
       weight: profile.weight || null,
       height: profile.height || null,
       fitnessLevel: profile.fitness_level || 'beginner',
@@ -2463,7 +2527,7 @@ async function loadUserContext(userId) {
     return {
       profile: profile ? {
         name: profile.name,
-        age: profile.age,
+        age: calculateAge(profile.birthdate, profile.age),
         fitness_level: profile.fitness_level,
         goals: profile.goals,
         constraints: profile.constraints
