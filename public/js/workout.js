@@ -152,13 +152,67 @@ function translateFitnessLevel(level) {
     return level; // Retourner la valeur originale si non reconnue
 }
 
+// Rendre les fonctions de formatage accessibles globalement
+if (typeof globalThis !== 'undefined') {
+    globalThis.translateFitnessLevel = translateFitnessLevel;
+    globalThis.formatGoals = formatGoals;
+    globalThis.formatDuration = formatDuration;
+} else if (typeof window !== 'undefined') {
+    window.translateFitnessLevel = translateFitnessLevel;
+    window.formatGoals = formatGoals;
+    window.formatDuration = formatDuration;
+}
+
 // Fonction pour formater les objectifs
 function formatGoals(goals) {
     if (!goals) return 'Général';
-    const goalsStr = String(goals).trim();
-    if (goalsStr === '' || goalsStr.toLowerCase() === 'general') return 'Général';
     
-    // Capitaliser la première lettre
+    // Si c'est un tableau, le convertir en chaîne
+    let goalsStr = Array.isArray(goals) ? goals.join(', ') : String(goals);
+    goalsStr = goalsStr.trim();
+    
+    if (goalsStr === '' || goalsStr.toLowerCase() === 'general' || goalsStr.toLowerCase() === 'général') {
+        return 'Général';
+    }
+    
+    // Traductions courantes
+    const translations = {
+        'weight loss': 'Perte de poids',
+        'perte de poids': 'Perte de poids',
+        'maigrir': 'Perte de poids',
+        'muscle gain': 'Prise de masse',
+        'prise de masse': 'Prise de masse',
+        'muscle': 'Prise de masse',
+        'endurance': 'Endurance',
+        'cardio': 'Cardio',
+        'flexibility': 'Flexibilité',
+        'flexibilité': 'Flexibilité',
+        'souplesse': 'Flexibilité',
+        'strength': 'Force',
+        'force': 'Force',
+        'toning': 'Tonification',
+        'tonification': 'Tonification',
+        'health': 'Santé',
+        'santé': 'Santé',
+        'wellness': 'Bien-être',
+        'bien-être': 'Bien-être'
+    };
+    
+    const lowerGoals = goalsStr.toLowerCase();
+    if (translations[lowerGoals]) {
+        return translations[lowerGoals];
+    }
+    
+    // Si plusieurs objectifs séparés par des virgules
+    if (goalsStr.includes(',')) {
+        return goalsStr.split(',').map(g => {
+            const trimmed = g.trim();
+            const lower = trimmed.toLowerCase();
+            return translations[lower] || (trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase());
+        }).join(', ');
+    }
+    
+    // Capitaliser la première lettre et mettre le reste en minuscule
     return goalsStr.charAt(0).toUpperCase() + goalsStr.slice(1).toLowerCase();
 }
 
@@ -171,7 +225,8 @@ function formatDuration(duration) {
         return durationStr;
     }
     // Sinon, convertir "4 weeks" en "4 semaines"
-    const match = durationStr.match(/(\d+)\s*(week|weeks|semaine|semaines)/i);
+    const regex = /(\d+)\s*(week|weeks|semaine|semaines)/i;
+    const match = regex.exec(durationStr);
     if (match) {
         const num = match[1];
         return `${num} ${num === '1' ? 'semaine' : 'semaines'}`;
@@ -188,8 +243,10 @@ async function displayWorkoutPlan(plan) {
         return;
     }
 
-    // Charger le profil utilisateur pour récupérer les valeurs réelles
+    // Charger le profil utilisateur et le profil étendu pour récupérer toutes les valeurs réelles
     let userProfile = null;
+    let extendedProfile = null;
+    
     try {
         if (typeof api !== 'undefined' && api.getProfile) {
             userProfile = await api.getProfile();
@@ -197,12 +254,41 @@ async function displayWorkoutPlan(plan) {
     } catch (error) {
         console.warn('Impossible de charger le profil utilisateur:', error);
     }
+    
+    try {
+        if (typeof api !== 'undefined' && api.getExtendedProfile) {
+            extendedProfile = await api.getExtendedProfile();
+        }
+    } catch (error) {
+        console.warn('Impossible de charger le profil étendu:', error);
+    }
 
     // Utiliser les valeurs du profil si disponibles, sinon celles du plan
     // Priorité: profil utilisateur > plan généré > valeurs par défaut
-    const fitnessLevel = (userProfile && userProfile.fitness_level) ? userProfile.fitness_level : (plan.level || 'beginner');
-    const goals = (userProfile && userProfile.goals) ? userProfile.goals : (plan.goals || 'general');
-    const duration = plan.duration || '4 weeks';
+    let fitnessLevel = null;
+    let goals = null;
+    let duration = null;
+    
+    // Récupérer le niveau de fitness
+    // Priorité: profil utilisateur > plan.level > plan.metadata.fitnessLevel > défaut
+    fitnessLevel = userProfile?.fitness_level || plan.level || plan.metadata?.fitnessLevel || 'beginner';
+    
+    // Récupérer les objectifs
+    // Priorité: profil utilisateur > plan.goals > plan.metadata.primaryGoals > défaut
+    goals = userProfile?.goals || plan.goals || plan.metadata?.primaryGoals || 'general';
+    
+    // Récupérer la durée
+    // Priorité: plan.duration > plan.metadata.duration > défaut
+    duration = plan.duration || plan.metadata?.duration || '4 weeks';
+    
+    // Log pour debug (peut être retiré en production)
+    console.log('Affichage plan - Données récupérées:', {
+        fitnessLevel,
+        goals,
+        duration,
+        hasUserProfile: !!userProfile,
+        hasExtendedProfile: !!extendedProfile
+    });
 
     // Charger le catalogue d'exercices pour les GIFs
     await loadExercisesCatalogForGifs();

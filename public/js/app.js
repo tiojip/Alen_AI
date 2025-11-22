@@ -28,11 +28,43 @@ async function loadDashboard() {
             if (preview) {
                 if (planData && planData.plan) {
                     const plan = planData.plan;
-                    const levelLabel = capitalize(plan.level);
+                    
+                    // Utiliser userProfile déjà chargé au début de la fonction
+                    const fitnessLevel = userProfile?.fitness_level || plan.level || 'beginner';
+                    const goals = userProfile?.goals || plan.goals || 'general';
+                    const duration = plan.duration || '4 weeks';
+                    
+                    // Utiliser les fonctions de formatage si disponibles, sinon formater manuellement
+                    let levelLabel, formattedGoals, formattedDuration;
+                    
+                    if (typeof globalThis !== 'undefined' && typeof globalThis.translateFitnessLevel === 'function') {
+                        levelLabel = globalThis.translateFitnessLevel(fitnessLevel);
+                    } else if (typeof window !== 'undefined' && typeof window.translateFitnessLevel === 'function') {
+                        levelLabel = window.translateFitnessLevel(fitnessLevel);
+                    } else {
+                        levelLabel = capitalize(fitnessLevel);
+                    }
+                    
+                    if (typeof globalThis !== 'undefined' && typeof globalThis.formatGoals === 'function') {
+                        formattedGoals = globalThis.formatGoals(goals);
+                    } else if (typeof window !== 'undefined' && typeof window.formatGoals === 'function') {
+                        formattedGoals = window.formatGoals(goals);
+                    } else {
+                        formattedGoals = goals || 'Personnalisation globale';
+                    }
+                    
+                    if (typeof globalThis !== 'undefined' && typeof globalThis.formatDuration === 'function') {
+                        formattedDuration = globalThis.formatDuration(duration);
+                    } else if (typeof window !== 'undefined' && typeof window.formatDuration === 'function') {
+                        formattedDuration = window.formatDuration(duration);
+                    } else {
+                        formattedDuration = duration || '4 semaines';
+                    }
+                    
                     preview.innerHTML = `
                         <p><strong>Niveau:</strong> ${levelLabel}</p>
-                        <p><strong>Objectif clé:</strong> ${plan.goals || 'Personnalisation globale'}</p>
-                        <p><strong>Durée:</strong> ${plan.duration || '4 semaines'}</p>
+                        <p><strong>Objectif clé:</strong> ${formattedGoals}</p>
+                        <p><strong>Durée:</strong> ${formattedDuration}</p>
                     `;
                     if (heroPlan) {
                         heroPlan.textContent = levelLabel || 'Personnalisé';
