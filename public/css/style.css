@@ -746,7 +746,6 @@ body.dark-mode .quick-action small {
     }
     
     .form-group input,
-    .form-group select,
     .form-group textarea,
     .form-group input[type="date"],
     .form-group input[type="text"],
@@ -767,6 +766,20 @@ body.dark-mode .quick-action small {
         margin: 0;
     }
     
+    .form-group select {
+        padding: 1rem 1.125rem;
+        padding-right: 2.75rem;
+        font-size: 16px;
+        min-height: 56px;
+        max-height: 56px;
+        height: 56px;
+        width: 100%;
+        box-sizing: border-box;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        margin: 0;
+    }
+    
     .form-group textarea {
         min-height: 80px;
         max-height: none;
@@ -776,6 +789,13 @@ body.dark-mode .quick-action small {
     #notification-settings input[type="time"],
     #pref-notification-time {
         max-width: 180px;
+    }
+    
+    .checkbox-group {
+        padding: 1rem 1.125rem;
+        font-size: 16px;
+        min-height: 56px;
+        max-height: 200px;
     }
     
     .card {
@@ -1056,8 +1076,8 @@ body.dark-mode .quick-action small {
     padding-right: 2.5rem;
     /* Uniformiser avec les autres champs */
     width: 100%;
-    padding: 0.875rem 1rem;
-    padding-right: 2.5rem;
+    padding: 1rem 1.125rem;
+    padding-right: 2.75rem;
     border: 2px solid var(--border-color);
     border-radius: 8px;
     font-size: 1rem;
@@ -1066,7 +1086,7 @@ body.dark-mode .quick-action small {
     font-family: inherit;
     transition: all 0.3s ease;
     box-sizing: border-box;
-    min-height: 48px;
+    min-height: 56px;
     max-height: 48px;
     height: 48px;
     line-height: 1.5;
@@ -1088,12 +1108,31 @@ body.dark-mode .quick-action small {
     margin-top: 0.5rem;
 }
 
-/* Checkbox groups pour objectifs et contraintes */
+/* Checkbox groups pour objectifs et contraintes - Style similaire au select */
 .checkbox-group {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
+    gap: 0.5rem;
+    margin-top: 0;
+    padding: 1rem 1.125rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-color);
+    min-height: 56px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+}
+
+.checkbox-group:hover {
+    border-color: var(--primary-color);
+}
+
+.checkbox-group:focus-within {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 
 .checkbox-label {
@@ -1101,9 +1140,10 @@ body.dark-mode .quick-action small {
     align-items: center;
     gap: 0.75rem;
     cursor: pointer;
-    padding: 0.5rem;
+    padding: 0.5rem 0.25rem;
     border-radius: 4px;
     transition: background-color 0.2s;
+    margin: 0;
 }
 
 .checkbox-label:hover {
