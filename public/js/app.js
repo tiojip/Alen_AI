@@ -447,8 +447,51 @@ async function loadProfile() {
             const weightInput = document.getElementById('profile-weight');
             const heightInput = document.getElementById('profile-height');
             const levelSelect = document.getElementById('profile-level');
-            const goalsInput = document.getElementById('profile-goals');
-            const constraintsInput = document.getElementById('profile-constraints');
+            // Gérer les objectifs (checkboxes)
+            const goalsContainer = document.getElementById('profile-goals-container');
+            if (goalsContainer && userProfile.goals != null) {
+                const goalsStr = String(userProfile.goals || '').trim();
+                if (goalsStr) {
+                    // Si c'est une chaîne séparée par des virgules, la diviser
+                    const goalsArray = goalsStr.includes(',') 
+                        ? goalsStr.split(',').map(g => g.trim())
+                        : [goalsStr];
+                    
+                    const goalCheckboxes = goalsContainer.querySelectorAll('.goal-checkbox');
+                    goalCheckboxes.forEach(checkbox => {
+                        const value = checkbox.value.trim();
+                        // Vérifier si cette valeur est dans la liste des objectifs
+                        checkbox.checked = goalsArray.some(g => 
+                            g.toLowerCase() === value.toLowerCase() ||
+                            g.toLowerCase().includes(value.toLowerCase()) ||
+                            value.toLowerCase().includes(g.toLowerCase())
+                        );
+                    });
+                }
+            }
+            
+            // Gérer les contraintes (checkboxes)
+            const constraintsContainer = document.getElementById('profile-constraints-container');
+            if (constraintsContainer && userProfile.constraints != null) {
+                const constraintsStr = String(userProfile.constraints || '').trim();
+                if (constraintsStr) {
+                    // Si c'est une chaîne séparée par des virgules, la diviser
+                    const constraintsArray = constraintsStr.includes(',') 
+                        ? constraintsStr.split(',').map(c => c.trim())
+                        : [constraintsStr];
+                    
+                    const constraintCheckboxes = constraintsContainer.querySelectorAll('.constraint-checkbox');
+                    constraintCheckboxes.forEach(checkbox => {
+                        const value = checkbox.value.trim();
+                        // Vérifier si cette valeur est dans la liste des contraintes
+                        checkbox.checked = constraintsArray.some(c => 
+                            c.toLowerCase() === value.toLowerCase() ||
+                            c.toLowerCase().includes(value.toLowerCase()) ||
+                            value.toLowerCase().includes(c.toLowerCase())
+                        );
+                    });
+                }
+            }
 
             if (nameInput && userProfile.name != null) nameInput.value = userProfile.name;
             // Gérer la date de naissance (convertir l'âge existant si nécessaire)
@@ -470,8 +513,7 @@ async function loadProfile() {
             if (weightInput && userProfile.weight != null) weightInput.value = userProfile.weight;
             if (heightInput && userProfile.height != null) heightInput.value = userProfile.height;
             if (levelSelect && userProfile.fitness_level) levelSelect.value = userProfile.fitness_level;
-            if (goalsInput && userProfile.goals != null) goalsInput.value = userProfile.goals;
-            if (constraintsInput && userProfile.constraints != null) constraintsInput.value = userProfile.constraints;
+            // Les objectifs et contraintes sont maintenant gérés par les checkboxes ci-dessus
         }
 
         // Remplir les préférences
@@ -857,11 +899,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const weightEl = document.getElementById('profile-weight');
         const heightEl = document.getElementById('profile-height');
         const levelEl = document.getElementById('profile-level');
-        const goalsEl = document.getElementById('profile-goals');
-        const constraintsEl = document.getElementById('profile-constraints');
+        // Récupérer les objectifs depuis les checkboxes
+        const goalsContainer = document.getElementById('profile-goals-container');
+        let goals = '';
+        if (goalsContainer) {
+            const selectedGoals = Array.from(goalsContainer.querySelectorAll('.goal-checkbox:checked'))
+                .map(cb => cb.value);
+            goals = selectedGoals.join(', ');
+        }
+        
+        // Récupérer les contraintes depuis les checkboxes
+        const constraintsContainer = document.getElementById('profile-constraints-container');
+        let constraints = '';
+        if (constraintsContainer) {
+            const selectedConstraints = Array.from(constraintsContainer.querySelectorAll('.constraint-checkbox:checked'))
+                .map(cb => cb.value);
+            constraints = selectedConstraints.join(', ');
+        }
         
         // Vérifier que tous les éléments existent avant d'accéder à leurs valeurs
-        if (!nameEl || !birthdateEl || !weightEl || !heightEl || !levelEl || !goalsEl || !constraintsEl) {
+        if (!nameEl || !birthdateEl || !weightEl || !heightEl || !levelEl) {
             console.error('Un ou plusieurs éléments du formulaire de profil sont manquants');
             throw new Error('Formulaire de profil incomplet. Veuillez recharger la page.');
         }
@@ -872,8 +929,8 @@ document.addEventListener('DOMContentLoaded', () => {
             weight: parseFloatOrNull(weightEl.value),
             height: parseIntOrNull(heightEl.value),
             fitness_level: levelEl.value,
-            goals: sanitizeText(goalsEl.value),
-            constraints: sanitizeText(constraintsEl.value)
+            goals: sanitizeText(goals),
+            constraints: sanitizeText(constraints)
         };
     };
 

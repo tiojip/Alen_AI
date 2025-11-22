@@ -1427,20 +1427,26 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
   const notes = [];
   const intensityAdjustments = [];
   
-  // Analyser les objectifs
+  // Analyser les objectifs (support des nouvelles checkboxes)
   const goalsLower = goals.toLowerCase();
-  const isMuscleGain = goalsLower.includes('muscle') || goalsLower.includes('masse') || mainMotivation === 'performance';
-  const isWeightLoss = goalsLower.includes('maigrir') || goalsLower.includes('perdre') || goalsLower.includes('poids') || mainMotivation === 'aesthetics';
+  const isMuscleGain = goalsLower.includes('muscle') || goalsLower.includes('masse') || 
+                        goalsLower.includes('prise de masse') || mainMotivation === 'performance';
+  const isWeightLoss = goalsLower.includes('maigrir') || goalsLower.includes('perdre') || 
+                        goalsLower.includes('poids') || goalsLower.includes('perte de poids') || 
+                        mainMotivation === 'aesthetics';
   const isEndurance = goalsLower.includes('endurance') || goalsLower.includes('cardio');
   const isFlexibility = goalsLower.includes('flexibilité') || goalsLower.includes('souplesse');
   
-  // Analyser les contraintes
+  // Analyser les contraintes (support des nouvelles checkboxes)
   const constraintsLower = constraints.toLowerCase();
   const hasBackPain = constraintsLower.includes('rein') || constraintsLower.includes('dos') || 
+                       constraintsLower.includes('problème de dos') ||
                        (extendedProfile?.injury_history?.toLowerCase().includes('dos') || extendedProfile?.injury_history?.toLowerCase().includes('rein'));
   const hasKneeIssues = constraintsLower.includes('genou') || 
+                         constraintsLower.includes('problème de genou') ||
                          (extendedProfile?.injury_history?.toLowerCase().includes('genou'));
   const hasShoulderIssues = constraintsLower.includes('épaule') || 
+                            constraintsLower.includes('problème d\'épaule') ||
                             (extendedProfile?.injury_history?.toLowerCase().includes('épaule'));
   
   // Sélectionner les exercices de base selon le niveau
@@ -1654,6 +1660,24 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     selectedExercises = [...EXERCISE_DATABASE.beginner];
   }
   
+  // GARANTIE ABSOLUE : S'assurer qu'on a au minimum 3 exercices
+  if (selectedExercises.length < 3) {
+    console.warn(`Seulement ${selectedExercises.length} exercice(s) après filtrage, ajout d'exercices par défaut`);
+    const defaultExercises = EXERCISE_DATABASE.beginner || EXERCISE_DATABASE.intermediate || EXERCISE_DATABASE.advanced;
+    const missingCount = 3 - selectedExercises.length;
+    const exercisesToAdd = defaultExercises
+      .filter(ex => !selectedExercises.some(se => se.name === ex.name))
+      .slice(0, missingCount);
+    if (exercisesToAdd.length > 0) {
+      selectedExercises.push(...exercisesToAdd);
+    } else {
+      // Si on ne peut pas ajouter d'exercices uniques, dupliquer les existants
+      while (selectedExercises.length < 3 && selectedExercises.length > 0) {
+        selectedExercises.push({...selectedExercises[0]});
+      }
+    }
+  }
+  
   console.log(`Exercices sélectionnés après tous les filtres: ${selectedExercises.length} exercices`);
   
   // Adapter la durée selon les préférences
@@ -1665,14 +1689,35 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
   
   // Ajuster le nombre d'exercices pour correspondre à la durée souhaitée
   if (currentDuration > targetSessionDuration * 1.2) {
-    // Trop long, réduire
-    selectedExercises = selectedExercises.slice(0, Math.ceil(selectedExercises.length * 0.8));
+    // Trop long, réduire mais GARANTIR au moins 2 exercices
+    const reducedCount = Math.max(2, Math.ceil(selectedExercises.length * 0.8));
+    selectedExercises = selectedExercises.slice(0, reducedCount);
   } else if (currentDuration < targetSessionDuration * 0.8 && selectedExercises.length < 8) {
     // Trop court, ajouter des exercices
     const additionalExercises = EXERCISE_DATABASE[level].filter(ex => 
       !selectedExercises.some(se => se.name === ex.name)
     );
-    selectedExercises.push(...additionalExercises.slice(0, 2));
+    if (additionalExercises.length > 0) {
+      selectedExercises.push(...additionalExercises.slice(0, 2));
+    }
+  }
+  
+  // GARANTIE FINALE : S'assurer qu'on a toujours au moins 2 exercices après ajustement de durée
+  if (selectedExercises.length < 2) {
+    console.warn(`Seulement ${selectedExercises.length} exercice(s) après ajustement de durée, ajout d'exercices`);
+    const defaultExercises = EXERCISE_DATABASE.beginner || EXERCISE_DATABASE.intermediate || EXERCISE_DATABASE.advanced;
+    const missingCount = 2 - selectedExercises.length;
+    const exercisesToAdd = defaultExercises
+      .filter(ex => !selectedExercises.some(se => se.name === ex.name))
+      .slice(0, missingCount);
+    if (exercisesToAdd.length > 0) {
+      selectedExercises.push(...exercisesToAdd);
+    } else if (selectedExercises.length > 0) {
+      // Si on ne peut pas ajouter d'exercices uniques, dupliquer les existants
+      while (selectedExercises.length < 2) {
+        selectedExercises.push({...selectedExercises[0]});
+      }
+    }
   }
   
   // Générer le plan hebdomadaire selon les disponibilités
@@ -1691,28 +1736,59 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     targetSessions = 3;
   }
 
-  // S'assurer qu'on a des exercices avant de générer le plan
+  // GARANTIE FINALE : S'assurer qu'on a toujours des exercices avant de générer le plan
   if (!selectedExercises || selectedExercises.length === 0) {
-    console.error('ERREUR: Aucun exercice sélectionné avant génération du plan hebdomadaire');
+    console.error('ERREUR CRITIQUE: Aucun exercice sélectionné avant génération du plan hebdomadaire');
     selectedExercises = [...EXERCISE_DATABASE.beginner];
+  }
+  
+  // GARANTIE : Au minimum 3 exercices
+  if (selectedExercises.length < 3) {
+    console.warn(`Seulement ${selectedExercises.length} exercice(s), ajout d'exercices supplémentaires`);
+    const defaultExercises = EXERCISE_DATABASE.beginner || EXERCISE_DATABASE.intermediate || EXERCISE_DATABASE.advanced;
+    const missingCount = 3 - selectedExercises.length;
+    const exercisesToAdd = defaultExercises
+      .filter(ex => !selectedExercises.some(se => se.name === ex.name))
+      .slice(0, missingCount);
+    selectedExercises.push(...exercisesToAdd);
   }
   
   console.log(`Génération plan: ${selectedExercises.length} exercices sélectionnés pour niveau ${level}`);
   
   const weeklyPlan = generateWeeklySchedule(selectedExercises, weeklyAvailability, preferredDuration, targetSessions);
   
-  // Vérifier que le plan généré contient des exercices
+  // VÉRIFICATION FINALE : S'assurer que le plan hebdomadaire contient des exercices
   const totalExercises = Object.values(weeklyPlan).reduce((sum, dayExercises) => {
     return sum + (Array.isArray(dayExercises) ? dayExercises.length : 0);
   }, 0);
   
   if (totalExercises === 0) {
-    console.error('ERREUR: Plan hebdomadaire généré sans exercices, utilisation du plan par défaut');
-    weeklyPlan.monday = selectedExercises.slice(0, Math.ceil(selectedExercises.length / 2));
-    weeklyPlan.wednesday = selectedExercises.slice(Math.ceil(selectedExercises.length / 2));
+    console.error('ERREUR CRITIQUE: Plan hebdomadaire généré sans exercices, création d\'un plan d\'urgence');
+    // Créer un plan d'urgence avec au moins 3 jours et des exercices
+    const emergencyExercises = selectedExercises.length > 0 ? selectedExercises : [...EXERCISE_DATABASE.beginner];
+    weeklyPlan.monday = emergencyExercises.slice(0, Math.min(3, emergencyExercises.length));
+    if (emergencyExercises.length > 3) {
+      weeklyPlan.wednesday = emergencyExercises.slice(3, Math.min(6, emergencyExercises.length));
+    }
+    if (emergencyExercises.length > 6) {
+      weeklyPlan.friday = emergencyExercises.slice(6);
+    }
   }
   
-  console.log(`Plan généré: ${Object.keys(weeklyPlan).length} jours avec ${totalExercises} exercices au total`);
+  // GARANTIE : Chaque jour doit avoir au moins 1 exercice
+  Object.keys(weeklyPlan).forEach(day => {
+    if (!weeklyPlan[day] || !Array.isArray(weeklyPlan[day]) || weeklyPlan[day].length === 0) {
+      console.warn(`Jour ${day} est vide, ajout d'un exercice par défaut`);
+      const defaultExercise = selectedExercises[0] || EXERCISE_DATABASE.beginner[0];
+      weeklyPlan[day] = [defaultExercise];
+    }
+  });
+  
+  const finalTotalExercises = Object.values(weeklyPlan).reduce((sum, dayExercises) => {
+    return sum + (Array.isArray(dayExercises) ? dayExercises.length : 0);
+  }, 0);
+  
+  console.log(`Plan généré: ${Object.keys(weeklyPlan).length} jours avec ${finalTotalExercises} exercices au total`);
   
   // Version du plan (pour traçabilité FR-06)
   const planVersion = `1.0.${Date.now()}`;
@@ -1885,10 +1961,12 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
   
   // Valider et nettoyer chaque jour du plan
   const cleanedWeeklyPlan = {};
+  const defaultExercise = { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 };
+  
   for (const [day, exercises] of Object.entries(aiPlan.weeklyPlan)) {
     if (!Array.isArray(exercises)) {
-      console.warn(`Jour ${day} invalide: pas un tableau, conversion...`);
-      cleanedWeeklyPlan[day] = Array.isArray(exercises) ? exercises : [];
+      console.warn(`Jour ${day} invalide: pas un tableau, ajout d'un exercice par défaut`);
+      cleanedWeeklyPlan[day] = [defaultExercise];
       continue;
     }
     
@@ -1921,15 +1999,31 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
         return cleaned;
       });
     
+    // GARANTIE : Chaque jour doit avoir au moins 1 exercice
     if (cleanedExercises.length > 0) {
       cleanedWeeklyPlan[day] = cleanedExercises;
+    } else {
+      // Si un jour n'a pas d'exercices valides, lui donner un exercice par défaut
+      console.warn(`Jour ${day} n'a pas d'exercices valides, ajout d'un exercice par défaut`);
+      cleanedWeeklyPlan[day] = [defaultExercise];
     }
   }
   
-  // Si après nettoyage le plan est vide, utiliser le plan de fallback
+  // GARANTIE ABSOLUE : Si après nettoyage le plan est vide, utiliser le plan de fallback
   if (Object.keys(cleanedWeeklyPlan).length === 0) {
-    throw new Error('Plan invalide: aucun exercice valide après nettoyage');
+    console.error('ERREUR CRITIQUE: Plan invalide: aucun exercice valide après nettoyage, création d\'un plan par défaut');
+    cleanedWeeklyPlan.monday = [defaultExercise];
+    cleanedWeeklyPlan.wednesday = [defaultExercise];
+    cleanedWeeklyPlan.friday = [defaultExercise];
   }
+  
+  // GARANTIE : Vérifier que chaque jour a au moins un exercice
+  Object.keys(cleanedWeeklyPlan).forEach(day => {
+    if (!cleanedWeeklyPlan[day] || !Array.isArray(cleanedWeeklyPlan[day]) || cleanedWeeklyPlan[day].length === 0) {
+      console.warn(`Jour ${day} est vide après nettoyage, ajout d'un exercice par défaut`);
+      cleanedWeeklyPlan[day] = [defaultExercise];
+    }
+  });
   
   aiPlan.weeklyPlan = cleanedWeeklyPlan;
   
@@ -2026,46 +2120,70 @@ function generateWeeklySchedule(exercises, availability, preferredDuration, targ
     selectedDays.push(nextDay);
   }
   
-  // S'assurer qu'il y a des exercices à répartir
+  // GARANTIE : S'assurer qu'on a des exercices à répartir
   if (!exercises || exercises.length === 0) {
-    console.warn('Aucun exercice à répartir, utilisation des exercices par défaut');
-    // Utiliser des exercices par défaut si la liste est vide
-    const defaultExercises = EXERCISE_DATABASE.beginner || [
-      { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 },
-      { name: 'Push-ups (genoux)', sets: 2, reps: 8, rest: 60, muscles: ['Pectoraux'], equipment: 'none', difficulty: 1 },
-      { name: 'Planche', sets: 3, duration: 20, rest: 60, muscles: ['Abdominaux'], equipment: 'mat', difficulty: 2 }
-    ];
-    exercises = defaultExercises;
+    console.error('ERREUR CRITIQUE dans generateWeeklySchedule: Aucun exercice fourni');
+    exercises = [...EXERCISE_DATABASE.beginner];
   }
   
   // Répartir les exercices sur les jours disponibles
-  const exercisesPerDay = Math.ceil(exercises.length / selectedDays.length);
+  // S'assurer qu'il y a au moins 1 exercice par jour, idéalement 2-4
+  const minExercisesPerDay = 2;
+  const maxExercisesPerDay = 4;
+  const exercisesPerDay = Math.max(minExercisesPerDay, Math.min(maxExercisesPerDay, Math.ceil(exercises.length / selectedDays.length)));
   
   selectedDays.forEach((day, index) => {
     const start = index * exercisesPerDay;
     const end = Math.min(start + exercisesPerDay, exercises.length);
-    const dayExercises = exercises.slice(start, end);
-    // S'assurer qu'il y a au moins un exercice par jour
-    if (dayExercises.length > 0) {
-      weeklyPlan[day] = dayExercises;
+    let dayExercises = exercises.slice(start, end);
+    
+    // GARANTIE : Chaque jour doit avoir au moins 1 exercice
+    if (dayExercises.length === 0) {
+      // Si ce jour n'a pas d'exercice, prendre le premier disponible ou un par défaut
+      dayExercises = [exercises[0] || EXERCISE_DATABASE.beginner[0]];
     }
+    
+    // Si on arrive à la fin et qu'il reste des exercices, les répartir
+    if (index === selectedDays.length - 1 && start + exercisesPerDay < exercises.length) {
+      dayExercises = exercises.slice(start);
+    }
+    
+    weeklyPlan[day] = dayExercises;
   });
   
-  // S'assurer qu'il y a au moins un jour avec des exercices
+  // GARANTIE ABSOLUE : S'assurer qu'il y a au moins un jour avec des exercices
   if (Object.keys(weeklyPlan).length === 0) {
-    console.warn('Aucun jour avec exercices, création d\'un plan par défaut');
-    weeklyPlan.monday = exercises.slice(0, Math.ceil(exercises.length / 3));
-    weeklyPlan.wednesday = exercises.slice(Math.ceil(exercises.length / 3), Math.ceil(exercises.length * 2 / 3));
-    weeklyPlan.friday = exercises.slice(Math.ceil(exercises.length * 2 / 3));
+    console.error('ERREUR CRITIQUE: Aucun jour avec exercices, création d\'un plan par défaut');
+    const defaultExercises = exercises.length > 0 ? exercises : [...EXERCISE_DATABASE.beginner];
+    weeklyPlan.monday = defaultExercises.slice(0, Math.min(3, defaultExercises.length));
+    if (defaultExercises.length > 3) {
+      weeklyPlan.wednesday = defaultExercises.slice(3, Math.min(6, defaultExercises.length));
+    }
+    if (defaultExercises.length > 6) {
+      weeklyPlan.friday = defaultExercises.slice(6);
+    }
   }
   
-  // S'assurer que chaque jour a au moins un exercice
+  // GARANTIE : S'assurer que chaque jour a au moins un exercice
   Object.keys(weeklyPlan).forEach(day => {
-    if (!weeklyPlan[day] || weeklyPlan[day].length === 0) {
-      // Si un jour est vide, lui donner au moins un exercice
-      weeklyPlan[day] = [exercises[0] || EXERCISE_DATABASE.beginner[0]];
+    if (!weeklyPlan[day] || !Array.isArray(weeklyPlan[day]) || weeklyPlan[day].length === 0) {
+      console.warn(`Jour ${day} est vide, ajout d'un exercice par défaut`);
+      const defaultExercise = exercises[0] || EXERCISE_DATABASE.beginner[0];
+      weeklyPlan[day] = [defaultExercise];
     }
   });
+  
+  // VÉRIFICATION FINALE : Compter le total d'exercices dans le plan
+  const totalExercisesInPlan = Object.values(weeklyPlan).reduce((sum, dayExercises) => {
+    return sum + (Array.isArray(dayExercises) ? dayExercises.length : 0);
+  }, 0);
+  
+  if (totalExercisesInPlan === 0) {
+    console.error('ERREUR CRITIQUE: Le plan hebdomadaire est complètement vide après génération');
+    weeklyPlan.monday = [EXERCISE_DATABASE.beginner[0] || { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 }];
+  }
+  
+  console.log(`Plan hebdomadaire généré: ${Object.keys(weeklyPlan).length} jours, ${totalExercisesInPlan} exercices au total`);
   
   return weeklyPlan;
 }
