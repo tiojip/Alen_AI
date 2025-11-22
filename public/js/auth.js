@@ -573,8 +573,54 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('nav-exercises')?.addEventListener('click', () => showPage('exercises-catalog'));
     document.getElementById('nav-profile').addEventListener('click', () => showPage('profile'));
     document.getElementById('nav-logout').addEventListener('click', () => {
+        // Nettoyer toutes les données utilisateur
         api.logout();
         currentUser = null;
+        
+        // Nettoyer le localStorage (garder seulement les préférences non sensibles si nécessaire)
+        localStorage.removeItem('token');
+        localStorage.removeItem('userProfile');
+        localStorage.removeItem('userPreferences');
+        
+        // Réinitialiser les formulaires de connexion/inscription
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        if (loginForm) loginForm.reset();
+        if (registerForm) registerForm.reset();
+        
+        // Réinitialiser les onglets de connexion/inscription pour afficher "Connexion" par défaut
+        const loginTab = document.querySelector('.tab-btn[data-tab="login"]');
+        const registerTab = document.querySelector('.tab-btn[data-tab="register"]');
+        if (loginTab) {
+            loginTab.classList.add('active');
+        }
+        if (registerTab) {
+            registerTab.classList.remove('active');
+        }
+        
+        // Afficher le formulaire de connexion et masquer celui d'inscription
+        if (loginForm) {
+            loginForm.classList.remove('hidden');
+        }
+        if (registerForm) {
+            registerForm.classList.add('hidden');
+        }
+        
+        // Masquer tous les messages d'erreur
+        const errorMessages = document.querySelectorAll('.error-message');
+        errorMessages.forEach(msg => {
+            msg.classList.remove('show');
+            msg.textContent = '';
+        });
+        
+        // Masquer le modal de réinitialisation de mot de passe s'il est ouvert
+        const passwordResetModal = document.getElementById('password-reset-modal');
+        if (passwordResetModal) {
+            passwordResetModal.style.display = 'none';
+            passwordResetModal.classList.remove('active');
+        }
+        
+        // Afficher la page de connexion
         showLogin();
     });
 

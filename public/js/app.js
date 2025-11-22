@@ -757,14 +757,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return trimmed.length ? trimmed : null;
         };
 
+        // Récupérer les éléments avec vérification de sécurité
+        const nameEl = document.getElementById('profile-name');
+        const birthdateEl = document.getElementById('profile-birthdate');
+        const weightEl = document.getElementById('profile-weight');
+        const heightEl = document.getElementById('profile-height');
+        const levelEl = document.getElementById('profile-level');
+        const goalsEl = document.getElementById('profile-goals');
+        const constraintsEl = document.getElementById('profile-constraints');
+        
+        // Vérifier que tous les éléments existent avant d'accéder à leurs valeurs
+        if (!nameEl || !birthdateEl || !weightEl || !heightEl || !levelEl || !goalsEl || !constraintsEl) {
+            console.error('Un ou plusieurs éléments du formulaire de profil sont manquants');
+            throw new Error('Formulaire de profil incomplet. Veuillez recharger la page.');
+        }
+        
         return {
-            name: sanitizeText(document.getElementById('profile-name').value),
-            birthdate: document.getElementById('profile-birthdate').value || null,
-            weight: parseFloatOrNull(document.getElementById('profile-weight').value),
-            height: parseIntOrNull(document.getElementById('profile-height').value),
-            fitness_level: document.getElementById('profile-level').value,
-            goals: sanitizeText(document.getElementById('profile-goals').value),
-            constraints: sanitizeText(document.getElementById('profile-constraints').value)
+            name: sanitizeText(nameEl.value),
+            birthdate: birthdateEl.value || null,
+            weight: parseFloatOrNull(weightEl.value),
+            height: parseIntOrNull(heightEl.value),
+            fitness_level: levelEl.value,
+            goals: sanitizeText(goalsEl.value),
+            constraints: sanitizeText(constraintsEl.value)
         };
     };
 
