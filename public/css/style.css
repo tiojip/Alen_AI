@@ -747,15 +747,20 @@ body.dark-mode .quick-action small {
     
     .form-group input,
     .form-group select,
-    .form-group textarea {
+    .form-group textarea,
+    .form-group input[type="date"],
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group .date-input,
+    .form-group-date input[type="date"],
+    .form-group-date .date-input {
         padding: 0.875rem 1rem;
         font-size: 16px; /* Évite le zoom automatique sur iOS */
         min-height: 48px; /* Taille de touche recommandée */
-    }
-    
-    .date-input {
-        font-size: 16px; /* Évite le zoom automatique sur iOS */
-        min-height: 48px;
+        width: 100%;
+        box-sizing: border-box;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
     }
     
     .card {
@@ -895,7 +900,11 @@ body.dark-mode .quick-action small {
 
 .form-group input,
 .form-group select,
-.form-group textarea {
+.form-group textarea,
+.form-group input[type="date"],
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group .date-input {
     width: 100%;
     padding: 0.875rem 1rem;
     border: 2px solid var(--border-color);
@@ -906,6 +915,8 @@ body.dark-mode .quick-action small {
     font-family: inherit;
     transition: all 0.3s ease;
     box-sizing: border-box;
+    min-height: 48px;
+    line-height: 1.5;
 }
 
 .form-group input:focus,
@@ -931,21 +942,56 @@ body.dark-mode .quick-action small {
 .form-group textarea {
     resize: vertical;
     min-height: 80px;
+    /* Uniformiser avec les autres champs */
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: inherit;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    line-height: 1.5;
 }
 
-/* Champ date optimisé */
+/* Champ date optimisé - uniformisé avec les autres champs */
 .form-group-date {
     position: relative;
 }
 
-.date-input {
+.form-group-date input[type="date"],
+.form-group-date .date-input {
+    width: 100%;
     padding: 0.875rem 1rem;
     font-size: 1rem;
     min-height: 48px;
     cursor: pointer;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: inherit;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    line-height: 1.5;
 }
 
-.date-input::-webkit-calendar-picker-indicator {
+.form-group-date input[type="date"]:focus,
+.form-group-date .date-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.form-group-date input[type="date"]:hover,
+.form-group-date .date-input:hover {
+    border-color: var(--primary-color);
+}
+
+.form-group-date input[type="date"]::-webkit-calendar-picker-indicator,
+.form-group-date .date-input::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0.7;
     padding: 0.25rem;
@@ -953,7 +999,8 @@ body.dark-mode .quick-action small {
     transition: opacity 0.2s;
 }
 
-.date-input::-webkit-calendar-picker-indicator:hover {
+.form-group-date input[type="date"]::-webkit-calendar-picker-indicator:hover,
+.form-group-date .date-input::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
 }
 
@@ -983,10 +1030,17 @@ body.dark-mode .quick-action small {
     background-repeat: no-repeat;
     background-position: right 1rem center;
     padding-right: 2.5rem;
+    /* Uniformiser avec les autres champs */
+    width: 100%;
+    min-height: 48px;
+    line-height: 1.5;
 }
 
 .form-group select:focus {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234CAF50' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 
 /* Availability checkboxes */

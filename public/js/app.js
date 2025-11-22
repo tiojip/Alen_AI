@@ -11,7 +11,15 @@ async function loadDashboard() {
     try {
         // Charger le profil
         userProfile = await api.getProfile();
-        const username = userProfile?.name || 'Athlète';
+        
+        // Extraire le prénom (premier mot) ou utiliser le nom complet, avec fallback sur "Athlète"
+        let username = 'Athlète';
+        if (userProfile?.name) {
+            const nameParts = userProfile.name.trim().split(/\s+/);
+            // Utiliser le prénom (premier mot) si disponible, sinon le nom complet
+            username = nameParts[0] || userProfile.name || 'Athlète';
+        }
+        
         const usernameEl = document.getElementById('dashboard-username');
         if (usernameEl) {
             usernameEl.textContent = username;
