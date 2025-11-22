@@ -28,7 +28,27 @@ function populateExtendedProfileForm(profile) {
     if (profile.fatigue_level) document.getElementById('profile-fatigue').value = profile.fatigue_level;
     
     // Habitudes de vie
-    if (profile.weekly_availability) document.getElementById('profile-availability').value = profile.weekly_availability;
+    if (profile.weekly_availability) {
+        // Charger les jours sélectionnés depuis la valeur sauvegardée
+        // Gérer différents formats : "Lundi, Mercredi" ou "Lundi,Mercredi" ou "lundi, mercredi"
+        const availabilityDays = profile.weekly_availability
+            .split(',')
+            .map(d => d.trim())
+            .map(d => {
+                // Normaliser : première lettre en majuscule, reste en minuscule
+                return d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
+            });
+        const checkboxes = document.querySelectorAll('.availability-day');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = availabilityDays.includes(checkbox.value);
+        });
+    } else {
+        // Réinitialiser toutes les checkboxes si aucune valeur n'est sauvegardée
+        const checkboxes = document.querySelectorAll('.availability-day');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+    }
     if (profile.preferred_session_duration) document.getElementById('profile-session-duration').value = profile.preferred_session_duration;
     if (profile.training_location) document.getElementById('profile-location').value = profile.training_location;
     if (profile.available_equipment) document.getElementById('profile-equipment').value = profile.available_equipment;
@@ -73,7 +93,11 @@ async function saveExtendedProfile(options = {}) {
         fatigue_level: parseInt(document.getElementById('profile-fatigue').value) || null,
         
         // Habitudes
-        weekly_availability: document.getElementById('profile-availability').value || null,
+        weekly_availability: (() => {
+            const selectedDays = Array.from(document.querySelectorAll('.availability-day:checked'))
+                .map(cb => cb.value);
+            return selectedDays.length > 0 ? selectedDays.join(', ') : null;
+        })(),
         preferred_session_duration: parseInt(document.getElementById('profile-session-duration').value) || null,
         training_location: document.getElementById('profile-location').value || null,
         available_equipment: document.getElementById('profile-equipment').value || null,

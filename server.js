@@ -686,9 +686,24 @@ app.delete('/api/user/account', authenticateToken, (req, res) => {
 // Routes plans d'entraînement
 app.post('/api/workout/generate', authenticateToken, async (req, res) => {
   const startTime = Date.now();
-  const { profile } = req.body;
   
   try {
+    // Récupérer le profil complet depuis la base de données pour garantir la personnalisation
+    const userProfile = await new Promise((resolve, reject) => {
+      db.get('SELECT id, email, name, age, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+        [req.user.id], (err, profile) => {
+        if (err) {
+          console.error('Erreur récupération profil:', err);
+          reject(err);
+        } else {
+          resolve(profile);
+        }
+      });
+    });
+    
+    // Utiliser le profil de la base de données, avec fallback sur celui du body si nécessaire
+    const profile = userProfile || req.body.profile || {};
+    
     // Récupérer le profil étendu pour une meilleure personnalisation (FR-06)
     const extendedProfile = await new Promise((resolve, reject) => {
       db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
@@ -700,6 +715,23 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
         }
       });
     });
+    
+    // Log pour vérifier que les données sont bien récupérées
+    console.log('Génération plan - Profil de base:', {
+      name: profile.name,
+      age: profile.age,
+      fitness_level: profile.fitness_level,
+      goals: profile.goals,
+      constraints: profile.constraints
+    });
+    if (extendedProfile) {
+      console.log('Génération plan - Profil étendu disponible:', {
+        available_equipment: extendedProfile.available_equipment,
+        preferred_session_duration: extendedProfile.preferred_session_duration,
+        main_motivation: extendedProfile.main_motivation,
+        weekly_availability: extendedProfile.weekly_availability
+      });
+    }
     
     // Génération améliorée avec IA (FR-06) - SLA ≤5s
     const plan = await generateWorkoutPlanAI(profile, extendedProfile, startTime);
@@ -722,8 +754,41 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
     );
   } catch (error) {
     console.error('Erreur génération plan:', error);
-    // Fallback sur génération basique
-    const plan = generateWorkoutPlan(profile);
+    
+    // En cas d'erreur, récupérer le profil depuis la base de données pour le fallback
+    let fallbackProfile = null;
+    let fallbackExtendedProfile = null;
+    
+    try {
+      fallbackProfile = await new Promise((resolve, reject) => {
+        db.get('SELECT id, email, name, age, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+          [req.user.id], (err, profile) => {
+          if (err) {
+            console.error('Erreur récupération profil pour fallback:', err);
+            resolve(req.body.profile || {});
+          } else {
+            resolve(profile || req.body.profile || {});
+          }
+        });
+      });
+      
+      fallbackExtendedProfile = await new Promise((resolve) => {
+        db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
+          if (err) {
+            console.error('Erreur récupération profil étendu pour fallback:', err);
+            resolve(null);
+          } else {
+            resolve(extProfile);
+          }
+        });
+      });
+    } catch (fallbackError) {
+      console.error('Erreur lors de la récupération du profil pour fallback:', fallbackError);
+      fallbackProfile = req.body.profile || {};
+    }
+    
+    // Fallback sur génération basique avec le profil récupéré
+    const plan = generateWorkoutPlanRules(fallbackProfile, fallbackExtendedProfile);
     const generationTime = Date.now() - startTime;
     db.run(
       'INSERT INTO workout_plans (user_id, plan_data, version, seed, generation_time) VALUES (?, ?, ?, ?, ?)',
@@ -1173,14 +1238,40 @@ async function generateWorkoutPlanWithOpenAI(profile, extendedProfile, timeBudge
       messages: [
         {
           role: 'system',
-          content: `Tu es Alen, coach sportif IA. Tu dois générer un plan d'entraînement personnalisé STRICTEMENT conforme au schéma JSON fourni. 
-Les informations envoyées décrivent le profil utilisateur, ses mesures physiques, ses habitudes de vie, ses motivations, son historique sportif et ses préférences techniques : exploite chacune de ces sections pour adapter la sélection d'exercices, le volume, l'intensité, les consignes et les notes.
-Ne mets AUCUN texte en dehors du JSON. Utilise uniquement des apostrophes dans les notes si tu veux citer quelque chose (pas de guillemets doubles non échappés).
-Respecte le schéma et garde les valeurs concises.`
+          content: `Tu es Alen, coach sportif IA. Tu dois générer un plan d'entraînement personnalisé STRICTEMENT conforme au schéma JSON fourni.
+
+INSTRUCTIONS IMPORTANTES:
+1. Utilise TOUTES les informations du profil utilisateur fourni pour personnaliser le plan:
+   - basicProfile: nom, âge, poids, taille, niveau de forme, objectifs principaux, contraintes
+   - physicalMetrics: IMC, composition corporelle, fréquence cardiaque au repos, mesures corporelles
+   - healthBackground: antécédents médicaux, blessures, qualité du sommeil, niveau de fatigue, type de régime
+   - lifestyleHabits: disponibilité hebdomadaire, durée de séance préférée, lieu d'entraînement, équipement disponible, heures assises par jour
+   - motivationAndPsychology: motivation principale, style de coaching préféré, facteurs de démotivation, score d'engagement, préférence sociale
+   - sportsHistory: sports pratiqués, fréquence d'entraînement passée, temps depuis le dernier entraînement, niveau technique
+   - technicalPreferences: objectifs mesurables, sensibilité des alertes, préférences de planification
+
+2. Adapte le plan selon:
+   - Le niveau de forme physique (beginner/intermediate/advanced)
+   - Les objectifs spécifiques (perte de poids, prise de masse, endurance, flexibilité, etc.)
+   - Les contraintes et blessures (éviter les exercices problématiques)
+   - L'équipement disponible (sans matériel, tapis, haltères, etc.)
+   - La durée de séance préférée
+   - La disponibilité hebdomadaire
+   - L'historique sportif et le niveau technique
+   - Les conditions de santé (IMC, fréquence cardiaque, fatigue, sommeil)
+
+3. Sélectionne les exercices appropriés et ajuste le volume (séries, répétitions, durée) et l'intensité selon le profil complet.
+
+4. Ne mets AUCUN texte en dehors du JSON. Utilise uniquement des apostrophes dans les notes si tu veux citer quelque chose (pas de guillemets doubles non échappés).
+5. Respecte le schéma et garde les valeurs concises.`
         },
         {
           role: 'user',
-          content: `Conçois un plan d'entraînement personnalisé en respectant ce contexte utilisateur: ${JSON.stringify(userContext)}`
+          content: `Conçois un plan d'entraînement personnalisé en utilisant TOUTES les informations du profil utilisateur suivant. Adapte chaque aspect du plan (exercices, volume, intensité, fréquence) selon ces données complètes:
+
+${JSON.stringify(userContext, null, 2)}
+
+Génère un plan hebdomadaire adapté avec des exercices spécifiques selon le niveau, les objectifs, les contraintes, l'équipement disponible, la durée préférée et toutes les autres informations du profil.`
         }
       ],
       max_tokens: 700,
@@ -1556,21 +1647,23 @@ function sanitizeContextObject(obj) {
 
 // Construire le contexte utilisateur pour l'IA (FR-06)
 function buildUserContext(profile = {}, extendedProfile = {}) {
+  // Calculer l'IMC si disponible
   const computedBmi =
     extendedProfile?.bmi ||
     (profile.weight && profile.height
       ? Number((profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1))
       : null);
 
+  // Construire le contexte complet avec toutes les informations du profil
   const context = {
     basicProfile: {
-      name: profile.name,
-      age: profile.age,
-      weight: profile.weight,
-      height: profile.height,
+      name: profile.name || 'Utilisateur',
+      age: profile.age || null,
+      weight: profile.weight || null,
+      height: profile.height || null,
       fitnessLevel: profile.fitness_level || 'beginner',
-      primaryGoals: profile.goals,
-      constraints: profile.constraints
+      primaryGoals: profile.goals || 'general',
+      constraints: profile.constraints || ''
     },
     physicalMetrics: {
       bmi: computedBmi,

@@ -876,6 +876,61 @@ body.dark-mode .quick-action small {
     resize: vertical;
 }
 
+/* Availability checkboxes */
+.availability-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.checkbox-label:hover {
+    background-color: var(--bg-secondary);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+.checkbox-label span {
+    font-size: 1rem;
+    color: var(--text-color);
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"]:checked + span {
+    font-weight: 500;
+    color: var(--primary-color);
+}
+
+@media (min-width: 600px) {
+    .availability-checkboxes {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .availability-checkboxes {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 /* Video containers */
 .video-container,
 .workout-video-container {
