@@ -3061,8 +3061,14 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
-});
+// Export pour Vercel (serverless)
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  // Démarrage local
+  app.listen(PORT, () => {
+    console.log(`Serveur démarré sur le port ${PORT}`);
+  });
+}
 
 
