@@ -353,29 +353,39 @@ function initDatabase() {
 
 // Middleware pour s'assurer que la base de données est initialisée
 function ensureDatabaseReady(req, res, next) {
-  if (!dbInitialized && !dbInitializing) {
-    console.log('Base de données non initialisée, initialisation...');
-    initDatabase();
+  // Si déjà initialisée, continuer immédiatement
+  if (dbInitialized) {
+    return next();
   }
-  // Attendre un peu si l'initialisation est en cours
+  
+  // Si en cours d'initialisation, attendre un peu
   if (dbInitializing) {
+    // Attendre jusqu'à 2 secondes pour l'initialisation
+    const startTime = Date.now();
     const checkReady = setInterval(() => {
       if (dbInitialized) {
         clearInterval(checkReady);
-        next();
+        return next();
+      }
+      // Timeout après 2 secondes
+      if (Date.now() - startTime > 2000) {
+        clearInterval(checkReady);
+        console.warn('Timeout initialisation DB, continuation quand même');
+        // Continuer quand même pour éviter de bloquer
+        return next();
       }
     }, 50);
-    // Timeout après 5 secondes
-    setTimeout(() => {
-      clearInterval(checkReady);
-      if (!dbInitialized) {
-        console.error('Timeout: Base de données non initialisée après 5 secondes');
-        return res.status(503).json({ error: 'Service temporairement indisponible. Veuillez réessayer.' });
-      }
-    }, 5000);
-  } else {
-    next();
+    return; // Ne pas appeler next() ici, attendre l'initialisation
   }
+  
+  // Sinon, démarrer l'initialisation
+  console.log('Base de données non initialisée, initialisation...');
+  initDatabase();
+  // Attendre un peu pour que l'initialisation commence
+  setTimeout(() => {
+    // Continuer même si pas encore initialisée (les requêtes géreront les erreurs)
+    next();
+  }, 100);
 }
 
 // Middleware d'authentification
@@ -711,14 +721,57 @@ app.put('/api/user/profile/extended', authenticateToken, (req, res) => {
 });
 
 // Routes préférences
-app.get('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, res) => {
-  console.log('Récupération des préférences pour user_id:', req.user.id);
-  db.get('SELECT * FROM preferences WHERE user_id = ?', [req.user.id], (err, prefs) => {
+app.get('/api/user/preferences', ensureDatabaseReady, (req, res) => {
+  // Vérifier le token manuellement pour permettre des valeurs par défaut si non connecté
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    // Pas de token = retourner les valeurs par défaut (pour initNotifications avant connexion)
+    console.log('Pas de token, retour des valeurs par défaut');
+    return res.json({ 
+      dark_mode: 0, 
+      weight_unit: 'kg', 
+      height_unit: 'cm', 
+      language: 'fr',
+      sounds: 1, 
+      notifications: 1 
+    });
+  }
+  
+  // Vérifier le token
+  jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.error('Erreur lors de la récupération des préférences:', err.message, err.code);
-      // Si la table n'existe pas, retourner les valeurs par défaut
-      if (err.message.includes('no such table') || err.code === 'SQLITE_ERROR') {
-        console.log('Table preferences n\'existe pas, retour des valeurs par défaut');
+      // Token invalide = retourner les valeurs par défaut
+      console.log('Token invalide, retour des valeurs par défaut');
+      return res.json({ 
+        dark_mode: 0, 
+        weight_unit: 'kg', 
+        height_unit: 'cm', 
+        language: 'fr',
+        sounds: 1, 
+        notifications: 1 
+      });
+    }
+    
+    console.log('Récupération des préférences pour user_id:', user.id);
+    db.get('SELECT * FROM preferences WHERE user_id = ?', [user.id], (err, prefs) => {
+      if (err) {
+        console.error('Erreur lors de la récupération des préférences:', err.message, err.code);
+        // Si la table n'existe pas, retourner les valeurs par défaut
+        if (err.message.includes('no such table') || err.code === 'SQLITE_ERROR') {
+          console.log('Table preferences n\'existe pas, retour des valeurs par défaut');
+          return res.json({ 
+            dark_mode: 0, 
+            weight_unit: 'kg', 
+            height_unit: 'cm', 
+            language: 'fr',
+            sounds: 1, 
+            notifications: 1 
+          });
+        }
+        // Pour toute autre erreur, retourner les valeurs par défaut plutôt qu'une erreur 500
+        console.warn('Erreur DB, retour des valeurs par défaut:', err.message);
         return res.json({ 
           dark_mode: 0, 
           weight_unit: 'kg', 
@@ -728,16 +781,15 @@ app.get('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, r
           notifications: 1 
         });
       }
-      return res.status(500).json({ error: 'Erreur lors de la récupération des préférences' });
-    }
-    console.log('Préférences récupérées:', prefs ? 'trouvées' : 'non trouvées, valeurs par défaut');
-    res.json(prefs || { 
-      dark_mode: 0, 
-      weight_unit: 'kg', 
-      height_unit: 'cm', 
-      language: 'fr',
-      sounds: 1, 
-      notifications: 1 
+      console.log('Préférences récupérées:', prefs ? 'trouvées' : 'non trouvées, valeurs par défaut');
+      res.json(prefs || { 
+        dark_mode: 0, 
+        weight_unit: 'kg', 
+        height_unit: 'cm', 
+        language: 'fr',
+        sounds: 1, 
+        notifications: 1 
+      });
     });
   });
 });
