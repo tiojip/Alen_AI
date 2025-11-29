@@ -301,7 +301,8 @@ function analyzePosture(landmarks, width, height) {
             // 1. Au moins 10 secondes se sont écoulées depuis le début de la séance
             // 2. L'avertissement n'a pas encore été affiché
             // 3. Il y a effectivement une mauvaise posture (highRiskErrors.length > 0)
-            if (timeSinceWorkoutStart >= WORKOUT_START_DELAY && !highRiskWarningShown && highRiskErrors.length > 0) {
+            // 4. Le score postural est inférieur à 10 (condition critique)
+            if (timeSinceWorkoutStart >= WORKOUT_START_DELAY && !highRiskWarningShown && highRiskErrors.length > 0 && postureScore < 10) {
                 triggerAutomaticStop('Risque postural élevé détecté. Séance interrompue pour votre sécurité.');
                 highRiskWarningShown = true; // Marquer que l'avertissement a été affiché (une seule fois)
             }

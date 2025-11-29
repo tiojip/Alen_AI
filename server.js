@@ -1762,16 +1762,46 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     return sum + (Array.isArray(dayExercises) ? dayExercises.length : 0);
   }, 0);
   
+  // Si le plan est vide, vérifier si c'est parce qu'aucun jour n'a été sélectionné
   if (totalExercises === 0) {
-    console.error('ERREUR CRITIQUE: Plan hebdomadaire généré sans exercices, création d\'un plan d\'urgence');
-    // Créer un plan d'urgence avec au moins 3 jours et des exercices
-    const emergencyExercises = selectedExercises.length > 0 ? selectedExercises : [...EXERCISE_DATABASE.beginner];
-    weeklyPlan.monday = emergencyExercises.slice(0, Math.min(3, emergencyExercises.length));
-    if (emergencyExercises.length > 3) {
-      weeklyPlan.wednesday = emergencyExercises.slice(3, Math.min(6, emergencyExercises.length));
-    }
-    if (emergencyExercises.length > 6) {
-      weeklyPlan.friday = emergencyExercises.slice(6);
+    if (!weeklyAvailability || weeklyAvailability.trim() === '') {
+      console.error('ERREUR: Aucune disponibilité hebdomadaire spécifiée par l\'utilisateur. Le plan ne peut pas être généré.');
+      // Retourner un plan vide plutôt que d'utiliser des jours par défaut
+      return {
+        weeklyPlan: {},
+        duration: '4 weeks',
+        createdAt: new Date().toISOString(),
+        version: `1.0.${Date.now()}`,
+        seed: generatePlanSeed(profile, extendedProfile),
+        metadata: {
+          equipment: extendedProfile?.available_equipment || 'none',
+          preferredDuration,
+          motivation: mainMotivation,
+          location: trainingLocation,
+          weeklyAvailability: '',
+          error: 'Aucune disponibilité hebdomadaire spécifiée'
+        },
+        notes: 'Veuillez sélectionner vos jours de disponibilité dans votre profil pour générer un plan d\'entraînement.'
+      };
+    } else {
+      console.error('ERREUR CRITIQUE: Plan hebdomadaire généré sans exercices malgré des jours disponibles');
+      // Utiliser le premier jour disponible (sélectionné par l'utilisateur)
+      const availableDays = weeklyAvailability.split(',').map(d => d.trim().toLowerCase());
+      const dayMapping = {
+        'lundi': 'monday', 'mardi': 'tuesday', 'mercredi': 'wednesday',
+        'jeudi': 'thursday', 'vendredi': 'friday', 'samedi': 'saturday', 'dimanche': 'sunday'
+      };
+      let firstDay = null;
+      for (const day of availableDays) {
+        if (dayMapping[day]) {
+          firstDay = dayMapping[day];
+          break;
+        }
+      }
+      if (firstDay) {
+        const emergencyExercises = selectedExercises.length > 0 ? selectedExercises : [...EXERCISE_DATABASE.beginner];
+        weeklyPlan[firstDay] = emergencyExercises.slice(0, Math.min(3, emergencyExercises.length));
+      }
     }
   }
   
@@ -2084,41 +2114,62 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
 }
 
 // Générer le planning hebdomadaire selon les disponibilités (FR-06)
+// UNIQUEMENT utiliser les jours sélectionnés par l'utilisateur
 function generateWeeklySchedule(exercises, availability, preferredDuration, targetSessions) {
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const weeklyPlan = {};
   
-  // Analyser les disponibilités
+  // Analyser les disponibilités - UNIQUEMENT les jours réellement sélectionnés par l'utilisateur
   let availableDays = [];
-  if (availability) {
+  if (availability && availability.trim() !== '') {
     const availabilityLower = availability.toLowerCase();
-    if (availabilityLower.includes('lundi') || availabilityLower.includes('monday')) availableDays.push('monday');
-    if (availabilityLower.includes('mardi') || availabilityLower.includes('tuesday')) availableDays.push('tuesday');
-    if (availabilityLower.includes('mercredi') || availabilityLower.includes('wednesday')) availableDays.push('wednesday');
-    if (availabilityLower.includes('jeudi') || availabilityLower.includes('thursday')) availableDays.push('thursday');
-    if (availabilityLower.includes('vendredi') || availabilityLower.includes('friday')) availableDays.push('friday');
-    if (availabilityLower.includes('samedi') || availabilityLower.includes('saturday')) availableDays.push('saturday');
-    if (availabilityLower.includes('dimanche') || availabilityLower.includes('sunday')) availableDays.push('sunday');
+    // Mapping des jours français vers anglais
+    const dayMapping = {
+      'lundi': 'monday',
+      'mardi': 'tuesday',
+      'mercredi': 'wednesday',
+      'jeudi': 'thursday',
+      'vendredi': 'friday',
+      'samedi': 'saturday',
+      'dimanche': 'sunday',
+      'monday': 'monday',
+      'tuesday': 'tuesday',
+      'wednesday': 'wednesday',
+      'thursday': 'thursday',
+      'friday': 'friday',
+      'saturday': 'saturday',
+      'sunday': 'sunday'
+    };
+    
+    // Parser la chaîne de disponibilité (format: "Lundi, Mercredi, Vendredi" ou "Lundi,Mercredi")
+    // Normaliser d'abord en minuscules pour la comparaison
+    const availabilityParts = availability.split(',').map(part => part.trim().toLowerCase());
+    
+    availabilityParts.forEach(part => {
+      // Chercher le jour correspondant dans le mapping (comparaison exacte en minuscules)
+      const matchedDay = dayMapping[part];
+      if (matchedDay && !availableDays.includes(matchedDay)) {
+        availableDays.push(matchedDay);
+      }
+    });
   }
   
-  // Si aucune disponibilité spécifiée, utiliser le pattern classique
+  // NE PAS utiliser de jours par défaut - utiliser UNIQUEMENT les jours sélectionnés par l'utilisateur
+  // Si aucun jour n'est sélectionné, retourner un plan vide ou avec un message d'erreur
   if (availableDays.length === 0) {
-    availableDays = ['monday', 'wednesday', 'friday'];
+    console.warn('Aucune disponibilité hebdomadaire spécifiée par l\'utilisateur. Le plan ne peut pas être généré sans jours de disponibilité.');
+    // Retourner un plan vide plutôt que d'utiliser des jours par défaut
+    return {};
   }
 
+  // Utiliser UNIQUEMENT les jours sélectionnés par l'utilisateur (pas de complément avec d'autres jours)
   const uniqueDays = [...new Set(availableDays)];
-  let sessionsTarget = targetSessions && targetSessions > 0 ? targetSessions : uniqueDays.length;
-  if (!sessionsTarget || sessionsTarget <= 0) {
-    sessionsTarget = 3;
-  }
-  const orderedDays = uniqueDays.length > 0 ? uniqueDays : ['monday', 'wednesday', 'friday'];
-  const selectedDays = orderedDays.slice(0, Math.min(sessionsTarget, orderedDays.length));
-  while (selectedDays.length < sessionsTarget) {
-    // compléter avec les jours restants du tableau days
-    const nextDay = days.find(d => !selectedDays.includes(d));
-    if (!nextDay) break;
-    selectedDays.push(nextDay);
-  }
+  
+  // Ne pas compléter avec d'autres jours - utiliser uniquement ceux sélectionnés
+  const selectedDays = uniqueDays;
+  
+  // Le nombre de sessions cible ne doit pas dépasser le nombre de jours disponibles
+  let sessionsTarget = targetSessions && targetSessions > 0 ? Math.min(targetSessions, selectedDays.length) : selectedDays.length;
   
   // GARANTIE : S'assurer qu'on a des exercices à répartir
   if (!exercises || exercises.length === 0) {
@@ -2152,16 +2203,12 @@ function generateWeeklySchedule(exercises, availability, preferredDuration, targ
   });
   
   // GARANTIE ABSOLUE : S'assurer qu'il y a au moins un jour avec des exercices
-  if (Object.keys(weeklyPlan).length === 0) {
-    console.error('ERREUR CRITIQUE: Aucun jour avec exercices, création d\'un plan par défaut');
+  // MAIS uniquement si des jours ont été sélectionnés par l'utilisateur
+  if (Object.keys(weeklyPlan).length === 0 && selectedDays.length > 0) {
+    console.error('ERREUR CRITIQUE: Aucun jour avec exercices malgré des jours disponibles');
+    // Utiliser le premier jour disponible (sélectionné par l'utilisateur)
     const defaultExercises = exercises.length > 0 ? exercises : [...EXERCISE_DATABASE.beginner];
-    weeklyPlan.monday = defaultExercises.slice(0, Math.min(3, defaultExercises.length));
-    if (defaultExercises.length > 3) {
-      weeklyPlan.wednesday = defaultExercises.slice(3, Math.min(6, defaultExercises.length));
-    }
-    if (defaultExercises.length > 6) {
-      weeklyPlan.friday = defaultExercises.slice(6);
-    }
+    weeklyPlan[selectedDays[0]] = defaultExercises.slice(0, Math.min(3, defaultExercises.length));
   }
   
   // GARANTIE : S'assurer que chaque jour a au moins un exercice

@@ -165,14 +165,15 @@ if (typeof globalThis !== 'undefined') {
 
 // Fonction pour formater les objectifs
 function formatGoals(goals) {
-    if (!goals) return 'Général';
+    if (!goals) return null;
     
     // Si c'est un tableau, le convertir en chaîne
     let goalsStr = Array.isArray(goals) ? goals.join(', ') : String(goals);
     goalsStr = goalsStr.trim();
     
+    // Ne pas retourner de valeur par défaut si vide ou "general"
     if (goalsStr === '' || goalsStr.toLowerCase() === 'general' || goalsStr.toLowerCase() === 'général') {
-        return 'Général';
+        return null;
     }
     
     // Traductions courantes
@@ -259,73 +260,71 @@ async function displayWorkoutPlan(plan) {
         console.warn('Impossible de charger le profil étendu:', error);
     }
 
+    // Récupérer UNIQUEMENT les informations saisies par l'utilisateur (pas de valeurs par défaut)
+    let fitnessLevel = null;
+    let goals = null;
+    let durationStr = null;
+    
+    // Récupérer le niveau de fitness - UNIQUEMENT si saisi par l'utilisateur
+    if (userProfile?.fitness_level && userProfile.fitness_level.trim() !== '') {
+        fitnessLevel = userProfile.fitness_level;
+    }
+    
+    // Récupérer les objectifs - UNIQUEMENT si saisis par l'utilisateur
+    if (userProfile?.goals && userProfile.goals.trim() !== '' && userProfile.goals.toLowerCase() !== 'general') {
+        goals = userProfile.goals;
+    }
+    
+    // Récupérer la durée - UNIQUEMENT si saisie par l'utilisateur
+    if (extendedProfile?.preferred_session_duration) {
+        durationStr = `${extendedProfile.preferred_session_duration} minutes par séance`;
+    } else if (userProfile?.preferred_session_duration) {
+        durationStr = `${userProfile.preferred_session_duration} minutes par séance`;
+    }
+
     if (!plan || !plan.weeklyPlan) {
-        // Même sans plan, afficher les informations du profil dans l'en-tête
-        let fitnessLevel = 'beginner';
-        let goals = 'general';
-        let durationStr = '4 semaines';
+        // Même sans plan, afficher les informations du profil dans l'en-tête (uniquement si saisies)
+        const translatedLevel = fitnessLevel ? translateFitnessLevel(fitnessLevel) : null;
+        const formattedGoals = goals ? formatGoals(goals) : null;
+        const formattedDuration = durationStr ? formatDuration(durationStr) : null;
         
-        if (userProfile) {
-            fitnessLevel = userProfile.fitness_level || 'beginner';
-            goals = userProfile.goals || 'general';
+        // Construire le HTML uniquement avec les informations disponibles
+        let infoItems = '';
+        if (translatedLevel) {
+            infoItems += `
+                <div class="plan-info-item">
+                    <span class="plan-info-label">Niveau</span>
+                    <span class="plan-info-value">${translatedLevel}</span>
+                </div>
+            `;
         }
-        
-        if (extendedProfile && extendedProfile.preferred_session_duration) {
-            durationStr = `${extendedProfile.preferred_session_duration} minutes par séance`;
+        if (formattedGoals) {
+            infoItems += `
+                <div class="plan-info-item">
+                    <span class="plan-info-label">Objectifs</span>
+                    <span class="plan-info-value">${formattedGoals}</span>
+                </div>
+            `;
         }
-        
-        const translatedLevel = translateFitnessLevel(fitnessLevel);
-        const formattedGoals = formatGoals(goals);
-        const formattedDuration = formatDuration(durationStr);
+        if (formattedDuration) {
+            infoItems += `
+                <div class="plan-info-item">
+                    <span class="plan-info-label">Durée</span>
+                    <span class="plan-info-value">${formattedDuration}</span>
+                </div>
+            `;
+        }
         
         container.innerHTML = `
             <div class="workout-plan-header">
                 <h3 class="workout-plan-title">Plan d'entraînement personnalisé</h3>
-                <div class="workout-plan-info">
-                    <div class="plan-info-item">
-                        <span class="plan-info-label">Niveau</span>
-                        <span class="plan-info-value">${translatedLevel}</span>
-                    </div>
-                    <div class="plan-info-item">
-                        <span class="plan-info-label">Objectifs</span>
-                        <span class="plan-info-value">${formattedGoals}</span>
-                    </div>
-                    <div class="plan-info-item">
-                        <span class="plan-info-label">Durée</span>
-                        <span class="plan-info-value">${formattedDuration}</span>
-                    </div>
-                </div>
+                ${infoItems ? `<div class="workout-plan-info">${infoItems}</div>` : ''}
             </div>
             <p style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; color: var(--text-color);">
                 Aucun plan disponible. Générez-en un depuis le dashboard.
             </p>
         `;
         return;
-    }
-
-    // Les profils ont déjà été chargés au début de la fonction
-
-    // TOUJOURS utiliser les valeurs du profil utilisateur en priorité absolue
-    // Ne JAMAIS utiliser les valeurs du plan si le profil est disponible
-    let fitnessLevel = 'beginner';
-    let goals = 'general';
-    let durationStr = '4 semaines';
-    
-    // Récupérer le niveau de fitness - UNIQUEMENT depuis le profil utilisateur
-    if (userProfile?.fitness_level) {
-        fitnessLevel = userProfile.fitness_level;
-    }
-    
-    // Récupérer les objectifs - UNIQUEMENT depuis le profil utilisateur
-    if (userProfile?.goals) {
-        goals = userProfile.goals;
-    }
-    
-    // Récupérer la durée - UNIQUEMENT depuis le profil étendu ou utilisateur
-    if (extendedProfile?.preferred_session_duration) {
-        durationStr = `${extendedProfile.preferred_session_duration} minutes par séance`;
-    } else if (userProfile?.preferred_session_duration) {
-        durationStr = `${userProfile.preferred_session_duration} minutes par séance`;
     }
     
     // Log pour debug (peut être retiré en production)
@@ -352,6 +351,11 @@ async function displayWorkoutPlan(plan) {
             totalExercises: plan.weeklyPlan ? Object.values(plan.weeklyPlan).reduce((sum, ex) => sum + (Array.isArray(ex) ? ex.length : 0), 0) : 0
         }
     });
+
+    // Traduire et formater uniquement les valeurs saisies par l'utilisateur
+    const translatedLevel = fitnessLevel ? translateFitnessLevel(fitnessLevel) : null;
+    const formattedGoals = goals ? formatGoals(goals) : null;
+    const formattedDuration = durationStr ? formatDuration(durationStr) : null;
 
     // Charger le catalogue d'exercices pour les GIFs
     await loadExercisesCatalogForGifs();
@@ -393,28 +397,37 @@ async function displayWorkoutPlan(plan) {
         btnEditPlan.style.display = 'inline-block';
     }
     
-    // Créer un header plus fluide et moderne
-    const translatedLevel = translateFitnessLevel(fitnessLevel);
-    const formattedGoals = formatGoals(goals);
-    const formattedDuration = formatDuration(durationStr);
+    // Créer un header avec uniquement les informations saisies par l'utilisateur
+    let infoItems = '';
+    if (translatedLevel) {
+        infoItems += `
+            <div class="plan-info-item">
+                <span class="plan-info-label">Niveau</span>
+                <span class="plan-info-value">${translatedLevel}</span>
+            </div>
+        `;
+    }
+    if (formattedGoals) {
+        infoItems += `
+            <div class="plan-info-item">
+                <span class="plan-info-label">Objectifs</span>
+                <span class="plan-info-value">${formattedGoals}</span>
+            </div>
+        `;
+    }
+    if (formattedDuration) {
+        infoItems += `
+            <div class="plan-info-item">
+                <span class="plan-info-label">Durée</span>
+                <span class="plan-info-value">${formattedDuration}</span>
+            </div>
+        `;
+    }
     
     let html = `
         <div class="workout-plan-header">
             <h3 class="workout-plan-title">Plan d'entraînement personnalisé</h3>
-            <div class="workout-plan-info">
-                <div class="plan-info-item">
-                    <span class="plan-info-label">Niveau</span>
-                    <span class="plan-info-value">${translatedLevel}</span>
-                </div>
-                <div class="plan-info-item">
-                    <span class="plan-info-label">Objectifs</span>
-                    <span class="plan-info-value">${formattedGoals}</span>
-                </div>
-                <div class="plan-info-item">
-                    <span class="plan-info-label">Durée</span>
-                    <span class="plan-info-value">${formattedDuration}</span>
-                </div>
-            </div>
+            ${infoItems ? `<div class="workout-plan-info">${infoItems}</div>` : ''}
         </div>
     `;
     
@@ -1144,11 +1157,24 @@ function stopWorkout() {
 
 async function finishWorkout() {
     const sessionData = collectSessionData('completed');
-    stopWorkout();
     
     if (!sessionData) {
+        console.warn('Aucune donnée de séance à sauvegarder');
+        stopWorkout();
         return;
     }
+
+    // Valider les données avant l'envoi
+    try {
+        JSON.stringify(sessionData);
+    } catch (error) {
+        console.error('Erreur sérialisation données séance:', error);
+        alert('Erreur: Les données de la séance sont invalides. Veuillez réessayer.');
+        stopWorkout();
+        return;
+    }
+    
+    stopWorkout();
     
     // Afficher le modal de bilan post-séance (FR-11)
     if (typeof showPostSessionModal === 'function') {
@@ -1156,7 +1182,10 @@ async function finishWorkout() {
     } else {
         // Fallback si le modal n'est pas disponible
         try {
-            await api.saveSession(sessionData, 'Séance terminée', sessionData.postureScore);
+            const postureScore = sessionData.postureScore || 0;
+            const validPostureScore = typeof postureScore === 'number' && !isNaN(postureScore) ? postureScore : 0;
+            
+            await api.saveSession(sessionData, 'Séance terminée', validPostureScore);
             alert('Séance enregistrée avec succès!');
             if (typeof loadDashboard === 'function') {
                 loadDashboard();
@@ -1165,7 +1194,15 @@ async function finishWorkout() {
             }
         } catch (error) {
             console.error('Erreur sauvegarde séance:', error);
-            alert('Erreur lors de la sauvegarde');
+            const errorMessage = error?.message || 'Erreur inconnue';
+            if (errorMessage.includes('Session expirée') || errorMessage.includes('Token')) {
+                alert('Votre session a expiré. Veuillez vous reconnecter.');
+                if (typeof showPage === 'function') {
+                    showPage('login');
+                }
+            } else {
+                alert(`Erreur lors de la sauvegarde: ${errorMessage}`);
+            }
         }
     }
 }
@@ -1177,17 +1214,40 @@ async function saveWorkoutSession() {
         return;
     }
 
+    // Valider les données avant l'envoi
+    try {
+        // Vérifier que sessionData peut être sérialisé en JSON
+        JSON.stringify(sessionData);
+    } catch (error) {
+        console.error('Erreur sérialisation données séance:', error);
+        alert('Erreur: Les données de la séance sont invalides. Veuillez réessayer.');
+        return;
+    }
+
     stopWorkout();
 
     try {
-        await api.saveSession(sessionData, 'Séance enregistrée manuellement', sessionData.postureScore);
+        // S'assurer que postureScore est un nombre valide
+        const postureScore = sessionData.postureScore || 0;
+        const validPostureScore = typeof postureScore === 'number' && !isNaN(postureScore) ? postureScore : 0;
+        
+        await api.saveSession(sessionData, 'Séance enregistrée manuellement', validPostureScore);
         alert('Séance enregistrée.');
         if (typeof loadDashboard === 'function') {
             loadDashboard();
         }
     } catch (error) {
         console.error('Erreur sauvegarde séance:', error);
-        alert('Erreur lors de l\'enregistrement de la séance.');
+        // Afficher un message d'erreur plus informatif
+        const errorMessage = error?.message || 'Erreur inconnue';
+        if (errorMessage.includes('Session expirée') || errorMessage.includes('Token')) {
+            alert('Votre session a expiré. Veuillez vous reconnecter.');
+            if (typeof showPage === 'function') {
+                showPage('login');
+            }
+        } else {
+            alert(`Erreur lors de l'enregistrement de la séance: ${errorMessage}`);
+        }
     }
 }
 
@@ -1201,21 +1261,35 @@ function collectSessionData(status = 'completed') {
     const postureScore = calculateAveragePostureScore();
     const exercisesCompleted = Math.min(currentExerciseIndex, currentWorkout.exercises.length);
 
+    // Nettoyer les données posturales pour éviter les références circulaires
+    let cleanedPostureData = [];
+    if (typeof workoutPostureData !== 'undefined' && Array.isArray(workoutPostureData)) {
+        cleanedPostureData = workoutPostureData.map(data => {
+            // Créer un objet propre sans références circulaires
+            return {
+                timestamp: data.timestamp || Date.now(),
+                score: typeof data.score === 'number' ? data.score : 0,
+                errors: Array.isArray(data.errors) ? data.errors : []
+                // Ne pas inclure landmarks pour éviter les données trop volumineuses
+            };
+        });
+    }
+
     return {
         workout: {
-            day: currentWorkout.day,
-            exercises: currentWorkout.exercises,
-            skippedExercises: currentWorkout.skippedExercises || [],
+            day: currentWorkout.day || 'unknown',
+            exercises: Array.isArray(currentWorkout.exercises) ? currentWorkout.exercises : [],
+            skippedExercises: Array.isArray(currentWorkout.skippedExercises) ? currentWorkout.skippedExercises : [],
             status,
             startedAt: currentWorkout.startTime || new Date(startedAt).toISOString(),
             endedAt: new Date().toISOString(),
-            currentExerciseIndex,
-            totalExercises: currentWorkout.exercises ? currentWorkout.exercises.length : 0
+            currentExerciseIndex: typeof currentExerciseIndex === 'number' ? currentExerciseIndex : 0,
+            totalExercises: Array.isArray(currentWorkout.exercises) ? currentWorkout.exercises.length : 0
         },
-        duration: durationSeconds,
-        postureScore,
-        exercisesCompleted,
-        postureData: typeof workoutPostureData !== 'undefined' ? workoutPostureData : []
+        duration: typeof durationSeconds === 'number' && durationSeconds >= 0 ? durationSeconds : 0,
+        postureScore: typeof postureScore === 'number' && !isNaN(postureScore) ? postureScore : 0,
+        exercisesCompleted: typeof exercisesCompleted === 'number' && exercisesCompleted >= 0 ? exercisesCompleted : 0,
+        postureData: cleanedPostureData
     };
 }
 

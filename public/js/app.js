@@ -12,17 +12,23 @@ async function loadDashboard() {
         // Charger le profil
         userProfile = await api.getProfile();
         
-        // Extraire le prénom (premier mot) ou utiliser le nom complet, avec fallback sur "Athlète"
-        let username = 'Athlète';
-        if (userProfile?.name) {
+        // Extraire le prénom (premier mot) ou utiliser le nom complet
+        let username = null;
+        if (userProfile?.name && userProfile.name.trim() !== '') {
             const nameParts = userProfile.name.trim().split(/\s+/);
             // Utiliser le prénom (premier mot) si disponible, sinon le nom complet
-            username = nameParts[0] || userProfile.name || 'Athlète';
+            username = nameParts[0] || userProfile.name;
         }
         
         const usernameEl = document.getElementById('dashboard-username');
         if (usernameEl) {
-            usernameEl.textContent = username;
+            // Afficher le nom de l'utilisateur s'il existe, sinon ne rien afficher (pas de fallback "Athlète")
+            if (username) {
+                usernameEl.textContent = username;
+            } else {
+                // Si pas de nom, afficher "Utilisateur" ou simplement masquer "Athlète"
+                usernameEl.textContent = 'Utilisateur';
+            }
         }
         
         // Charger le plan d'entraînement

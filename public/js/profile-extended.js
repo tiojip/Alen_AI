@@ -27,26 +27,31 @@ function populateExtendedProfileForm(profile) {
     if (profile.sleep_quality) document.getElementById('profile-sleep-quality').value = profile.sleep_quality;
     if (profile.fatigue_level) document.getElementById('profile-fatigue').value = profile.fatigue_level;
     
-    // Habitudes de vie
-    if (profile.weekly_availability) {
+    // Habitudes de vie - Disponibilité hebdomadaire
+    // UNIQUEMENT afficher les jours réellement sélectionnés par l'utilisateur (pas de valeurs par défaut)
+    const checkboxes = document.querySelectorAll('.availability-day');
+    
+    // D'abord, réinitialiser toutes les checkboxes
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Ensuite, cocher UNIQUEMENT les jours qui ont été réellement saisis par l'utilisateur
+    if (profile.weekly_availability && profile.weekly_availability.trim() !== '') {
         // Charger les jours sélectionnés depuis la valeur sauvegardée
         // Gérer différents formats : "Lundi, Mercredi" ou "Lundi,Mercredi" ou "lundi, mercredi"
         const availabilityDays = profile.weekly_availability
             .split(',')
             .map(d => d.trim())
+            .filter(d => d !== '') // Filtrer les chaînes vides
             .map(d => {
                 // Normaliser : première lettre en majuscule, reste en minuscule
                 return d.charAt(0).toUpperCase() + d.slice(1).toLowerCase();
             });
-        const checkboxes = document.querySelectorAll('.availability-day');
+        
+        // Cocher uniquement les jours qui sont dans la liste des jours sélectionnés
         checkboxes.forEach(checkbox => {
             checkbox.checked = availabilityDays.includes(checkbox.value);
-        });
-    } else {
-        // Réinitialiser toutes les checkboxes si aucune valeur n'est sauvegardée
-        const checkboxes = document.querySelectorAll('.availability-day');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = false;
         });
     }
     if (profile.preferred_session_duration) document.getElementById('profile-session-duration').value = profile.preferred_session_duration;
@@ -92,10 +97,13 @@ async function saveExtendedProfile(options = {}) {
         sleep_quality: parseInt(document.getElementById('profile-sleep-quality').value) || null,
         fatigue_level: parseInt(document.getElementById('profile-fatigue').value) || null,
         
-        // Habitudes
+        // Habitudes - Disponibilité hebdomadaire
+        // Sauvegarder UNIQUEMENT les jours réellement cochés par l'utilisateur
         weekly_availability: (() => {
             const selectedDays = Array.from(document.querySelectorAll('.availability-day:checked'))
-                .map(cb => cb.value);
+                .map(cb => cb.value)
+                .filter(day => day && day.trim() !== ''); // Filtrer les valeurs vides
+            // Retourner null si aucun jour n'est sélectionné (pas de valeur par défaut)
             return selectedDays.length > 0 ? selectedDays.join(', ') : null;
         })(),
         preferred_session_duration: parseInt(document.getElementById('profile-session-duration').value) || null,
