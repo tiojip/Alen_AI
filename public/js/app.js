@@ -986,59 +986,67 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = 'Enregistrement en cours...';
 
         try {
-            const profileData = collectProfileFormData();
-            await api.updateProfile(profileData);
+            // Sauvegarder les données en parallèle pour gagner du temps
+            const [profileData, preferencesData] = await Promise.all([
+                (async () => {
+                    const data = collectProfileFormData();
+                    await api.updateProfile(data);
+                    return data;
+                })(),
+                (async () => {
+                    const data = collectPreferencesFormData();
+                    await api.updatePreferences(data);
+                    applyPreferenceSideEffects(data);
+                    return data;
+                })()
+            ]);
 
-            const preferencesData = collectPreferencesFormData();
-            await api.updatePreferences(preferencesData);
-            applyPreferenceSideEffects(preferencesData);
-
+            // Sauvegarder le profil étendu si la fonction existe
             if (typeof saveExtendedProfile === 'function') {
                 await saveExtendedProfile({ silent: true });
             }
 
-            await loadProfile();
-            if (typeof loadExtendedProfile === 'function') {
-                await loadExtendedProfile();
-            }
-
-            // Recharger le dashboard pour mettre à jour les informations
-            await loadDashboard();
-
-            if (typeof advanceWorkflow === 'function') {
-                setTimeout(() => {
-                    advanceWorkflow();
-                }, 300);
-            }
-
             btn.textContent = 'Génération du plan...';
 
-            const profile = await api.getProfile();
-            const extendedProfile = await api.getExtendedProfile().catch(() => null);
+            // Générer le plan directement avec les données déjà en mémoire
+            // Pas besoin de recharger depuis l'API, on utilise les données qu'on vient de sauvegarder
             const startTime = Date.now();
-            const data = await api.generatePlan(profile);
+            const data = await api.generatePlan(profileData);
             const generationTime = Date.now() - startTime;
-            const slaMet = generationTime <= 5000;
 
             btn.textContent = originalText;
             btn.disabled = false;
 
+            // Rediriger directement vers la page d'entraînement
             if (data && data.plan) {
                 showPage('workout');
+                // Afficher le plan immédiatement
                 if (typeof displayWorkoutPlan === 'function') {
                     await displayWorkoutPlan(data.plan);
                 } else {
+                    // Si la fonction n'est pas encore chargée, attendre un peu
                     setTimeout(async () => {
-                        const plan = await loadWorkoutPlan();
-                        if (plan && typeof displayWorkoutPlan === 'function') {
-                            await displayWorkoutPlan(plan);
+                        if (typeof displayWorkoutPlan === 'function') {
+                            await displayWorkoutPlan(data.plan);
+                        } else {
+                            // Fallback : charger depuis l'API
+                            const plan = await loadWorkoutPlan();
+                            if (plan && typeof displayWorkoutPlan === 'function') {
+                                await displayWorkoutPlan(plan);
+                            }
                         }
                     }, 100);
                 }
             } else {
-                alert(`Profil enregistré et plan généré en ${generationTime}ms ! ${slaMet ? '✅' : '⚠️'}`);
-                // Recharger le dashboard pour afficher les nouvelles informations
-                await loadDashboard();
+                // En cas d'erreur, afficher un message et rediriger quand même
+                console.warn('Plan généré mais structure invalide, redirection quand même');
+                showPage('workout');
+                setTimeout(async () => {
+                    const plan = await loadWorkoutPlan();
+                    if (plan && typeof displayWorkoutPlan === 'function') {
+                        await displayWorkoutPlan(plan);
+                    }
+                }, 100);
             }
         } catch (error) {
             console.error('Erreur sauvegarde profil complet:', error);

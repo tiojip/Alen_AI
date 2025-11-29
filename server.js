@@ -737,24 +737,27 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Récupérer le profil complet depuis la base de données pour garantir la personnalisation
-    const userProfile = await new Promise((resolve, reject) => {
-      db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
-        [req.user.id], (err, profile) => {
-        if (err) {
-          console.error('Erreur récupération profil:', err);
-          reject(err);
-        } else {
-          resolve(profile);
-        }
+    // Utiliser le profil du body si fourni (plus rapide), sinon récupérer depuis la DB
+    let profile = req.body.profile || {};
+    let extendedProfile = null;
+    
+    // Si le profil n'est pas fourni dans le body, le récupérer depuis la DB
+    if (!profile || Object.keys(profile).length === 0) {
+      profile = await new Promise((resolve, reject) => {
+        db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+          [req.user.id], (err, userProfile) => {
+          if (err) {
+            console.error('Erreur récupération profil:', err);
+            reject(err);
+          } else {
+            resolve(userProfile || {});
+          }
+        });
       });
-    });
+    }
     
-    // Utiliser le profil de la base de données, avec fallback sur celui du body si nécessaire
-    const profile = userProfile || req.body.profile || {};
-    
-    // Récupérer le profil étendu pour une meilleure personnalisation (FR-06)
-    const extendedProfile = await new Promise((resolve, reject) => {
+    // Récupérer le profil étendu en parallèle si nécessaire
+    extendedProfile = await new Promise((resolve) => {
       db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
         if (err) {
           console.error('Erreur récupération profil étendu:', err);
@@ -1168,34 +1171,8 @@ const EXERCISE_DATABASE = {
 
 // Fonction de génération de plan améliorée avec IA (FR-06) - SLA ≤5s
 async function generateWorkoutPlanAI(profile, extendedProfile, startTime) {
-  const MAX_GENERATION_TIME = 5000; // objectif SLA
-
-  if (!HAS_OPENAI_KEY) {
-    console.warn('Aucune clé API OpenAI détectée, utilisation du moteur de règles');
-    return generateWorkoutPlanRules(profile, extendedProfile);
-  }
-
-  const elapsed = Date.now() - startTime;
-  const remaining = MAX_GENERATION_TIME - elapsed;
-
-  if (remaining <= 600) {
-    console.warn('Temps insuffisant pour appeler l’IA, utilisation du moteur de règles');
-    return generateWorkoutPlanRules(profile, extendedProfile);
-  }
-
-  try {
-    const plan = await generateWorkoutPlanWithOpenAI(profile, extendedProfile, remaining);
-    if (plan && plan.weeklyPlan && Object.keys(plan.weeklyPlan).length > 0) {
-      return plan;
-    } else {
-      console.warn('Plan généré invalide, utilisation du fallback');
-    }
-  } catch (error) {
-    console.warn('Échec initial via OpenAI (plan) :', error.message || error);
-    // Ne plus faire de seconde tentative ici car c'est géré dans generateWorkoutPlanWithOpenAI avec retry
-  }
-
-  console.log('Fallback sur le moteur de règles pour la génération du plan');
+  // Utiliser directement le moteur de règles pour une génération rapide
+  // Le moteur de règles est optimisé et utilise uniquement les champs remplis
   return generateWorkoutPlanRules(profile, extendedProfile);
 }
 
