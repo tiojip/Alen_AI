@@ -360,15 +360,16 @@ function ensureDatabaseReady(req, res, next) {
   
   // Si en cours d'initialisation, attendre un peu
   if (dbInitializing) {
-    // Attendre jusqu'à 2 secondes pour l'initialisation
+    // Attendre jusqu'à 1 seconde pour l'initialisation
     const startTime = Date.now();
+    const maxWait = 1000;
     const checkReady = setInterval(() => {
       if (dbInitialized) {
         clearInterval(checkReady);
         return next();
       }
-      // Timeout après 2 secondes
-      if (Date.now() - startTime > 2000) {
+      // Timeout après maxWait
+      if (Date.now() - startTime > maxWait) {
         clearInterval(checkReady);
         console.warn('Timeout initialisation DB, continuation quand même');
         // Continuer quand même pour éviter de bloquer
@@ -380,12 +381,18 @@ function ensureDatabaseReady(req, res, next) {
   
   // Sinon, démarrer l'initialisation
   console.log('Base de données non initialisée, initialisation...');
-  initDatabase();
-  // Attendre un peu pour que l'initialisation commence
-  setTimeout(() => {
-    // Continuer même si pas encore initialisée (les requêtes géreront les erreurs)
+  try {
+    initDatabase();
+    // Attendre un peu pour que l'initialisation commence
+    setTimeout(() => {
+      // Continuer même si pas encore initialisée (les requêtes géreront les erreurs)
+      next();
+    }, 100);
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation de la base de données:', error);
+    // Continuer quand même pour éviter de bloquer
     next();
-  }, 100);
+  }
 }
 
 // Middleware d'authentification
@@ -722,13 +729,69 @@ app.put('/api/user/profile/extended', authenticateToken, (req, res) => {
 
 // Routes préférences
 app.get('/api/user/preferences', ensureDatabaseReady, (req, res) => {
-  // Vérifier le token manuellement pour permettre des valeurs par défaut si non connecté
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) {
-    // Pas de token = retourner les valeurs par défaut (pour initNotifications avant connexion)
-    console.log('Pas de token, retour des valeurs par défaut');
+  try {
+    console.log('=== GET /api/user/preferences ===');
+    
+    // Vérifier le token manuellement pour permettre des valeurs par défaut si non connecté
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    // Valeurs par défaut
+    const defaultPrefs = { 
+      dark_mode: 0, 
+      weight_unit: 'kg', 
+      height_unit: 'cm', 
+      language: 'fr',
+      sounds: 1, 
+      notifications: 1 
+    };
+    
+    if (!token) {
+      // Pas de token = retourner les valeurs par défaut (pour initNotifications avant connexion)
+      console.log('Pas de token, retour des valeurs par défaut');
+      return res.json(defaultPrefs);
+    }
+    
+    // Vérifier le token avec gestion d'erreur
+    try {
+      jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+          // Token invalide = retourner les valeurs par défaut
+          console.log('Token invalide, retour des valeurs par défaut:', err.message);
+          return res.json(defaultPrefs);
+        }
+        
+        if (!user || !user.id) {
+          console.log('Token valide mais user.id manquant, retour des valeurs par défaut');
+          return res.json(defaultPrefs);
+        }
+        
+        console.log('Récupération des préférences pour user_id:', user.id);
+        
+        // Vérifier que la base de données est disponible
+        if (!db) {
+          console.error('Base de données non disponible');
+          return res.json(defaultPrefs);
+        }
+        
+        db.get('SELECT * FROM preferences WHERE user_id = ?', [user.id], (err, prefs) => {
+          if (err) {
+            console.error('Erreur DB lors de la récupération des préférences:', err.message, err.code);
+            // Pour TOUTE erreur DB, retourner les valeurs par défaut
+            return res.json(defaultPrefs);
+          }
+          
+          console.log('Préférences récupérées:', prefs ? 'trouvées' : 'non trouvées, valeurs par défaut');
+          res.json(prefs || defaultPrefs);
+        });
+      });
+    } catch (jwtError) {
+      console.error('Erreur lors de la vérification du token:', jwtError);
+      return res.json(defaultPrefs);
+    }
+  } catch (error) {
+    console.error('Erreur exception dans /api/user/preferences:', error);
+    // En cas d'erreur inattendue, retourner les valeurs par défaut
     return res.json({ 
       dark_mode: 0, 
       weight_unit: 'kg', 
@@ -738,60 +801,6 @@ app.get('/api/user/preferences', ensureDatabaseReady, (req, res) => {
       notifications: 1 
     });
   }
-  
-  // Vérifier le token
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      // Token invalide = retourner les valeurs par défaut
-      console.log('Token invalide, retour des valeurs par défaut');
-      return res.json({ 
-        dark_mode: 0, 
-        weight_unit: 'kg', 
-        height_unit: 'cm', 
-        language: 'fr',
-        sounds: 1, 
-        notifications: 1 
-      });
-    }
-    
-    console.log('Récupération des préférences pour user_id:', user.id);
-    db.get('SELECT * FROM preferences WHERE user_id = ?', [user.id], (err, prefs) => {
-      if (err) {
-        console.error('Erreur lors de la récupération des préférences:', err.message, err.code);
-        // Si la table n'existe pas, retourner les valeurs par défaut
-        if (err.message.includes('no such table') || err.code === 'SQLITE_ERROR') {
-          console.log('Table preferences n\'existe pas, retour des valeurs par défaut');
-          return res.json({ 
-            dark_mode: 0, 
-            weight_unit: 'kg', 
-            height_unit: 'cm', 
-            language: 'fr',
-            sounds: 1, 
-            notifications: 1 
-          });
-        }
-        // Pour toute autre erreur, retourner les valeurs par défaut plutôt qu'une erreur 500
-        console.warn('Erreur DB, retour des valeurs par défaut:', err.message);
-        return res.json({ 
-          dark_mode: 0, 
-          weight_unit: 'kg', 
-          height_unit: 'cm', 
-          language: 'fr',
-          sounds: 1, 
-          notifications: 1 
-        });
-      }
-      console.log('Préférences récupérées:', prefs ? 'trouvées' : 'non trouvées, valeurs par défaut');
-      res.json(prefs || { 
-        dark_mode: 0, 
-        weight_unit: 'kg', 
-        height_unit: 'cm', 
-        language: 'fr',
-        sounds: 1, 
-        notifications: 1 
-      });
-    });
-  });
 });
 
 app.put('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, res) => {
@@ -3238,6 +3247,26 @@ app.post('/api/session/advice', authenticateToken, async (req, res) => {
 // Route pour servir l'application
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Gestionnaire d'erreurs global (doit être après toutes les routes)
+app.use((err, req, res, next) => {
+  console.error('=== ERREUR SERVEUR NON GÉRÉE ===');
+  console.error('URL:', req.url);
+  console.error('Method:', req.method);
+  console.error('Error:', err);
+  console.error('Stack:', err.stack);
+  console.error('================================');
+  
+  // Ne pas exposer les détails de l'erreur en production
+  const errorMessage = process.env.NODE_ENV === 'development' 
+    ? err.message 
+    : 'Une erreur interne du serveur est survenue';
+  
+  res.status(500).json({ 
+    error: errorMessage,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 // Export pour Vercel (serverless)
