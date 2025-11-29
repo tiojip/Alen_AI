@@ -118,10 +118,34 @@ async function initAuth() {
         return;
     }
     
-    // TOUJOURS commencer par la page de connexion/inscription au démarrage
-    // Ne plus vérifier le token automatiquement - l'utilisateur doit se connecter manuellement
-    console.log('Affichage de la page de connexion/inscription au démarrage');
-    showLogin();
+    if (token) {
+        try {
+            console.log('Tentative de chargement du profil...');
+            const profile = await api.getProfile();
+            currentUser = profile;
+            console.log('Profil chargé:', profile);
+            // Attendre un peu pour s'assurer que le DOM est prêt
+            setTimeout(() => {
+                showApp();
+            }, 100);
+        } catch (error) {
+            console.error('Erreur chargement profil:', error);
+            // Si erreur d'authentification, déconnecter et montrer login
+            if (error.message.includes('Session expirée') || error.message.includes('Token')) {
+                api.logout();
+                showLogin();
+            } else {
+                // Autre erreur, essayer quand même de montrer l'app
+                console.warn('Erreur chargement profil:', error);
+                setTimeout(() => {
+                    showApp();
+                }, 100);
+            }
+        }
+    } else {
+        console.log('Pas de token, affichage de la page de login');
+        showLogin();
+    }
 }
 
 function showLogin() {
@@ -270,16 +294,6 @@ function showWorkflowMessage(message) {
     if (appContainer) {
         appContainer.insertBefore(messageDiv, appContainer.firstChild);
     }
-    
-    // Disparaître automatiquement après 5 secondes
-    setTimeout(() => {
-        if (messageDiv && messageDiv.parentElement) {
-            messageDiv.style.animation = 'slideUp 0.3s ease';
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 300);
-        }
-    }, 5000);
 }
 
 // Fonction globale pour passer à l'étape suivante du workflow
@@ -512,28 +526,6 @@ document.addEventListener('DOMContentLoaded', () => {
         navLinks?.classList.toggle('open');
         navToggle.classList.toggle('open');
     });
-    
-    // Fermer automatiquement le menu lors du scroll
-    let scrollTimeout = null;
-    let isScrolling = false;
-    
-    window.addEventListener('scroll', () => {
-        // Détecter le début du scroll et fermer immédiatement le menu
-        if (!isScrolling) {
-            isScrolling = true;
-            // Fermer immédiatement le menu au début du scroll
-            if (navLinks?.classList.contains('open')) {
-                navLinks.classList.remove('open');
-                navToggle?.classList.remove('open');
-            }
-        }
-        
-        // Réinitialiser le flag après un court délai
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-            isScrolling = false;
-        }, 150);
-    }, { passive: true });
 
     // Login
     document.getElementById('login-form').addEventListener('submit', async (e) => {

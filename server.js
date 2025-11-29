@@ -74,70 +74,9 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
   }
 });
 
-// Variable pour suivre l'état d'initialisation
-let dbInitialized = false;
-let dbInitializing = false;
-
 // Initialisation des tables
 function initDatabase() {
-  if (dbInitializing) {
-    console.log('Base de données déjà en cours d\'initialisation...');
-    return;
-  }
-  if (dbInitialized) {
-    console.log('Base de données déjà initialisée');
-    return;
-  }
-  
-  dbInitializing = true;
-  console.log('Début de l\'initialisation de la base de données...');
-  
   db.serialize(() => {
-    // Table utilisateurs (doit être créée en premier)
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT,
-      age INTEGER,
-      birthdate TEXT,
-      weight REAL,
-      height REAL,
-      fitness_level TEXT,
-      goals TEXT,
-      constraints TEXT,
-      consent_date DATETIME,
-      consent_version TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`, (err) => {
-      if (err) {
-        console.error('Erreur création table users:', err);
-      } else {
-        console.log('Table users créée/vérifiée');
-      }
-    });
-    
-    // Table préférences (doit être créée avant les migrations)
-    db.run(`CREATE TABLE IF NOT EXISTS preferences (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER UNIQUE NOT NULL,
-      dark_mode INTEGER DEFAULT 0,
-      weight_unit TEXT DEFAULT 'kg',
-      height_unit TEXT DEFAULT 'cm',
-      language TEXT DEFAULT 'fr',
-      sounds INTEGER DEFAULT 1,
-      notifications INTEGER DEFAULT 1,
-      notification_time TEXT,
-      notification_days TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )`, (err) => {
-      if (err) {
-        console.error('Erreur création table preferences:', err);
-      } else {
-        console.log('Table preferences créée/vérifiée');
-      }
-    });
-    
     // Migration: Ajouter les colonnes manquantes pour FR-06
     db.run(`ALTER TABLE workout_plans ADD COLUMN version TEXT`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
@@ -183,6 +122,24 @@ function initDatabase() {
         console.error('Erreur migration notification_days:', err);
       }
     });
+    
+    // Table utilisateurs (avec champs consentement Loi 25)
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      name TEXT,
+      age INTEGER,
+      birthdate TEXT,
+      weight REAL,
+      height REAL,
+      fitness_level TEXT,
+      goals TEXT,
+      constraints TEXT,
+      consent_date DATETIME,
+      consent_version TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
     
     // Migration: Ajouter la colonne birthdate si elle n'existe pas
     db.run(`ALTER TABLE users ADD COLUMN birthdate TEXT`, (err) => {
@@ -337,62 +294,8 @@ function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       used_at DATETIME,
       FOREIGN KEY (user_id) REFERENCES users(id)
-    )`, (err) => {
-      if (err) {
-        console.error('Erreur création table password_reset_tokens:', err);
-      } else {
-        console.log('Table password_reset_tokens créée/vérifiée');
-      }
-      // Marquer l'initialisation comme terminée
-      dbInitialized = true;
-      dbInitializing = false;
-      console.log('Initialisation de la base de données terminée');
-    });
+    )`);
   });
-}
-
-// Middleware pour s'assurer que la base de données est initialisée
-function ensureDatabaseReady(req, res, next) {
-  // Si déjà initialisée, continuer immédiatement
-  if (dbInitialized) {
-    return next();
-  }
-  
-  // Si en cours d'initialisation, attendre un peu
-  if (dbInitializing) {
-    // Attendre jusqu'à 1 seconde pour l'initialisation
-    const startTime = Date.now();
-    const maxWait = 1000;
-    const checkReady = setInterval(() => {
-      if (dbInitialized) {
-        clearInterval(checkReady);
-        return next();
-      }
-      // Timeout après maxWait
-      if (Date.now() - startTime > maxWait) {
-        clearInterval(checkReady);
-        console.warn('Timeout initialisation DB, continuation quand même');
-        // Continuer quand même pour éviter de bloquer
-        return next();
-      }
-    }, 50);
-    return; // Ne pas appeler next() ici, attendre l'initialisation
-  }
-  
-  // Sinon, démarrer l'initialisation
-  console.log('Base de données non initialisée, initialisation...');
-  try {
-    initDatabase();
-    // Attendre un peu pour que l'initialisation commence
-    setTimeout(() => {
-      // Continuer même si pas encore initialisée (les requêtes géreront les erreurs)
-      next();
-    }, 100);
-  } catch (error) {
-    console.error('Erreur lors de l\'initialisation de la base de données:', error);
-    // Continuer quand même pour éviter de bloquer
-    next();
-  }
 }
 
 // Middleware d'authentification
@@ -414,69 +317,38 @@ function authenticateToken(req, res, next) {
 }
 
 // Routes d'authentification
-app.post('/api/auth/register', ensureDatabaseReady, async (req, res) => {
-  console.log('=== Début inscription ===');
+app.post('/api/auth/register', async (req, res) => {
   const { email, password, name } = req.body;
-  console.log('Données reçues:', { email, hasPassword: !!password, name });
 
   if (!email || !password) {
-    console.log('Validation échouée: email ou mot de passe manquant');
     return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
   try {
-    console.log('Hachage du mot de passe...');
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('Mot de passe haché avec succès');
     
-    console.log('Insertion dans la base de données...');
     db.run(
       'INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
       [email, hashedPassword, name || ''],
       function(err) {
         if (err) {
-          console.error('Erreur DB lors de l\'insertion:', err.message, err.code);
-          if (err.message.includes('UNIQUE') || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          if (err.message.includes('UNIQUE')) {
             return res.status(400).json({ error: 'Email déjà utilisé' });
           }
-          // Vérifier si c'est une erreur de table inexistante
-          if (err.message.includes('no such table') || err.message.includes('SQLITE_ERROR')) {
-            console.error('Table users n\'existe pas, initialisation de la base...');
-            initDatabase();
-            return res.status(500).json({ error: 'Base de données en cours d\'initialisation. Veuillez réessayer dans quelques secondes.' });
-          }
-          return res.status(500).json({ error: 'Erreur lors de la création du compte. Veuillez réessayer.' });
+          return res.status(500).json({ error: err.message });
         }
 
         const userId = this.lastID;
-        console.log('Utilisateur créé avec ID:', userId);
-        
-        try {
-          const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '30d' });
-          console.log('Token JWT généré');
+        const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '30d' });
 
-          // Créer les préférences par défaut avec gestion d'erreur
-          db.run('INSERT INTO preferences (user_id) VALUES (?)', [userId], (prefErr) => {
-            if (prefErr) {
-              // Log l'erreur mais ne bloque pas l'inscription
-              console.error('Erreur lors de la création des préférences par défaut:', prefErr.message);
-              // Les préférences peuvent être créées plus tard, l'inscription est réussie
-            } else {
-              console.log('Préférences par défaut créées');
-            }
-            // Répondre avec succès même si les préférences n'ont pas pu être créées
-            console.log('=== Inscription réussie ===');
-            res.json({ token, user: { id: userId, email, name: name || '' } });
-          });
-        } catch (tokenError) {
-          console.error('Erreur génération token:', tokenError);
-          return res.status(500).json({ error: 'Erreur lors de la génération du token. Veuillez réessayer.' });
-        }
+        // Créer les préférences par défaut
+        db.run('INSERT INTO preferences (user_id) VALUES (?)', [userId]);
+
+        res.json({ token, user: { id: userId, email, name } });
       }
     );
   } catch (error) {
-    console.error('Erreur exception lors de l\'inscription:', error);
-    res.status(500).json({ error: 'Erreur serveur lors de l\'inscription. Veuillez réessayer.' });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -728,71 +600,12 @@ app.put('/api/user/profile/extended', authenticateToken, (req, res) => {
 });
 
 // Routes préférences
-app.get('/api/user/preferences', ensureDatabaseReady, (req, res) => {
-  try {
-    console.log('=== GET /api/user/preferences ===');
-    
-    // Vérifier le token manuellement pour permettre des valeurs par défaut si non connecté
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    
-    // Valeurs par défaut
-    const defaultPrefs = { 
-      dark_mode: 0, 
-      weight_unit: 'kg', 
-      height_unit: 'cm', 
-      language: 'fr',
-      sounds: 1, 
-      notifications: 1 
-    };
-    
-    if (!token) {
-      // Pas de token = retourner les valeurs par défaut (pour initNotifications avant connexion)
-      console.log('Pas de token, retour des valeurs par défaut');
-      return res.json(defaultPrefs);
+app.get('/api/user/preferences', authenticateToken, (req, res) => {
+  db.get('SELECT * FROM preferences WHERE user_id = ?', [req.user.id], (err, prefs) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
     }
-    
-    // Vérifier le token avec gestion d'erreur
-    try {
-      jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-          // Token invalide = retourner les valeurs par défaut
-          console.log('Token invalide, retour des valeurs par défaut:', err.message);
-          return res.json(defaultPrefs);
-        }
-        
-        if (!user || !user.id) {
-          console.log('Token valide mais user.id manquant, retour des valeurs par défaut');
-          return res.json(defaultPrefs);
-        }
-        
-        console.log('Récupération des préférences pour user_id:', user.id);
-        
-        // Vérifier que la base de données est disponible
-        if (!db) {
-          console.error('Base de données non disponible');
-          return res.json(defaultPrefs);
-        }
-        
-        db.get('SELECT * FROM preferences WHERE user_id = ?', [user.id], (err, prefs) => {
-          if (err) {
-            console.error('Erreur DB lors de la récupération des préférences:', err.message, err.code);
-            // Pour TOUTE erreur DB, retourner les valeurs par défaut
-            return res.json(defaultPrefs);
-          }
-          
-          console.log('Préférences récupérées:', prefs ? 'trouvées' : 'non trouvées, valeurs par défaut');
-          res.json(prefs || defaultPrefs);
-        });
-      });
-    } catch (jwtError) {
-      console.error('Erreur lors de la vérification du token:', jwtError);
-      return res.json(defaultPrefs);
-    }
-  } catch (error) {
-    console.error('Erreur exception dans /api/user/preferences:', error);
-    // En cas d'erreur inattendue, retourner les valeurs par défaut
-    return res.json({ 
+    res.json(prefs || { 
       dark_mode: 0, 
       weight_unit: 'kg', 
       height_unit: 'cm', 
@@ -800,12 +613,11 @@ app.get('/api/user/preferences', ensureDatabaseReady, (req, res) => {
       sounds: 1, 
       notifications: 1 
     });
-  }
+  });
 });
 
-app.put('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, res) => {
+app.put('/api/user/preferences', authenticateToken, (req, res) => {
   const { dark_mode, weight_unit, height_unit, language, sounds, notifications, notification_time, notification_days } = req.body;
-  console.log('Mise à jour des préférences pour user_id:', req.user.id);
   
   // Convertir notification_days en JSON si c'est un tableau
   const notificationDaysStr = notification_days ? 
@@ -827,16 +639,8 @@ app.put('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, r
     [req.user.id, dark_mode ? 1 : 0, weight_unit || 'kg', height_unit || 'cm', language || 'fr', sounds ? 1 : 0, notifications ? 1 : 0, notification_time || null, notificationDaysStr],
     (err) => {
       if (err) {
-        console.error('Erreur lors de la mise à jour des préférences:', err.message, err.code);
-        // Si la table n'existe pas, initialiser la base et retourner une erreur
-        if (err.message.includes('no such table') || err.code === 'SQLITE_ERROR') {
-          console.log('Table preferences n\'existe pas, initialisation de la base...');
-          initDatabase();
-          return res.status(503).json({ error: 'Base de données en cours d\'initialisation. Veuillez réessayer dans quelques secondes.' });
-        }
-        return res.status(500).json({ error: 'Erreur lors de la mise à jour des préférences' });
+        return res.status(500).json({ error: err.message });
       }
-      console.log('Préférences mises à jour avec succès');
       res.json({ message: 'Préférences mises à jour' });
     }
   );
@@ -933,36 +737,37 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // OPTIMISATION: Récupérer les profils en PARALLÈLE pour gagner du temps
-    const [userProfile, extendedProfile] = await Promise.all([
-      new Promise((resolve, reject) => {
-        db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
-          [req.user.id], (err, profile) => {
-          if (err) {
-            console.error('Erreur récupération profil:', err);
-            reject(err);
-          } else {
-            resolve(profile);
-          }
-        });
-      }),
-      new Promise((resolve) => {
-        db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
-          if (err) {
-            console.error('Erreur récupération profil étendu:', err);
-            resolve(null);
-          } else {
-            resolve(extProfile);
-          }
-        });
-      })
-    ]);
+    // Récupérer le profil complet depuis la base de données pour garantir la personnalisation
+    const userProfile = await new Promise((resolve, reject) => {
+      db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+        [req.user.id], (err, profile) => {
+        if (err) {
+          console.error('Erreur récupération profil:', err);
+          reject(err);
+        } else {
+          resolve(profile);
+        }
+      });
+    });
     
     // Utiliser le profil de la base de données, avec fallback sur celui du body si nécessaire
     const profile = userProfile || req.body.profile || {};
     
-    // OPTIMISATION: Génération rapide avec moteur de règles qui utilise toutes les infos du profil
-    // Le moteur de règles est optimisé et utilise toutes les données du profil et profil étendu
+    // Récupérer le profil étendu pour une meilleure personnalisation (FR-06)
+    const extendedProfile = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
+        if (err) {
+          console.error('Erreur récupération profil étendu:', err);
+          resolve(null);
+        } else {
+          resolve(extProfile);
+        }
+      });
+    });
+    
+    // Génération rapide du plan personnalisé (utilise toutes les informations du profil)
+    // Le moteur de règles est optimisé et utilise: niveau, objectifs, contraintes, équipement, 
+    // disponibilité hebdomadaire, durée préférée, motivation, historique sportif, etc.
     const plan = await generateWorkoutPlanAI(profile, extendedProfile, startTime);
     const generationTime = Date.now() - startTime;
     
@@ -984,35 +789,33 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Erreur génération plan:', error);
     
-    // En cas d'erreur, récupérer le profil depuis la base de données pour le fallback (en parallèle)
+    // En cas d'erreur, récupérer le profil depuis la base de données pour le fallback
     let fallbackProfile = null;
     let fallbackExtendedProfile = null;
     
     try {
-      // OPTIMISATION: Récupération en parallèle pour le fallback aussi
-      [fallbackProfile, fallbackExtendedProfile] = await Promise.all([
-        new Promise((resolve) => {
-          db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
-            [req.user.id], (err, profile) => {
-            if (err) {
-              console.error('Erreur récupération profil pour fallback:', err);
-              resolve(req.body.profile || {});
-            } else {
-              resolve(profile || req.body.profile || {});
-            }
-          });
-        }),
-        new Promise((resolve) => {
-          db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
-            if (err) {
-              console.error('Erreur récupération profil étendu pour fallback:', err);
-              resolve(null);
-            } else {
-              resolve(extProfile);
-            }
-          });
-        })
-      ]);
+      fallbackProfile = await new Promise((resolve, reject) => {
+        db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+          [req.user.id], (err, profile) => {
+          if (err) {
+            console.error('Erreur récupération profil pour fallback:', err);
+            resolve(req.body.profile || {});
+          } else {
+            resolve(profile || req.body.profile || {});
+          }
+        });
+      });
+      
+      fallbackExtendedProfile = await new Promise((resolve) => {
+        db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
+          if (err) {
+            console.error('Erreur récupération profil étendu pour fallback:', err);
+            resolve(null);
+          } else {
+            resolve(extProfile);
+          }
+        });
+      });
     } catch (fallbackError) {
       console.error('Erreur lors de la récupération du profil pour fallback:', fallbackError);
       fallbackProfile = req.body.profile || {};
@@ -1348,49 +1151,21 @@ const EXERCISE_DATABASE = {
   ]
 };
 
-// Fonction de génération de plan améliorée avec IA (FR-06) - SLA ≤5s
+// Fonction de génération de plan optimisée - Utilise le moteur de règles en priorité (rapide)
+// Le moteur de règles utilise TOUTES les informations du profil utilisateur et est beaucoup plus rapide (<1s)
 async function generateWorkoutPlanAI(profile, extendedProfile, startTime) {
-  // OPTIMISATION: Utiliser directement le moteur de règles pour une génération rapide
-  // Le moteur de règles utilise toutes les informations du profil et est beaucoup plus rapide (<1s vs 3-5s pour l'IA)
-  // Il génère des plans personnalisés de qualité équivalente en utilisant les données du profil
-  
-  // Si l'utilisateur veut forcer l'utilisation de l'IA, il peut définir FORCE_AI_PLAN=true
-  const FORCE_AI = process.env.FORCE_AI_PLAN === 'true';
-  
-  if (!FORCE_AI) {
-    // Utiliser directement le moteur de règles (rapide et utilise toutes les infos du profil)
-    console.log('Génération rapide avec moteur de règles (utilise toutes les infos du profil)');
-    return generateWorkoutPlanRules(profile, extendedProfile);
-  }
-
-  // Code pour l'IA (seulement si FORCE_AI_PLAN=true)
-  const MAX_GENERATION_TIME = 5000;
-  
-  if (!HAS_OPENAI_KEY) {
-    console.warn('Aucune clé API OpenAI détectée, utilisation du moteur de règles');
-    return generateWorkoutPlanRules(profile, extendedProfile);
-  }
-
-  const elapsed = Date.now() - startTime;
-  const remaining = MAX_GENERATION_TIME - elapsed;
-
-  if (remaining <= 600) {
-    console.warn('Temps insuffisant pour appeler l'IA, utilisation du moteur de règles');
-    return generateWorkoutPlanRules(profile, extendedProfile);
-  }
-
-  try {
-    const plan = await generateWorkoutPlanWithOpenAI(profile, extendedProfile, remaining);
-    if (plan && plan.weeklyPlan && Object.keys(plan.weeklyPlan).length > 0) {
-      return plan;
-    } else {
-      console.warn('Plan généré invalide, utilisation du fallback');
-    }
-  } catch (error) {
-    console.warn('Échec initial via OpenAI (plan) :', error.message || error);
-  }
-
-  console.log('Fallback sur le moteur de règles pour la génération du plan');
+  // OPTIMISATION: Utiliser le moteur de règles en priorité car il est rapide (<1s) et utilise TOUTES les infos du profil
+  // Le moteur de règles prend en compte TOUTES les informations saisies par l'utilisateur:
+  // - Niveau de forme physique (beginner/intermediate/advanced)
+  // - Objectifs (perte de poids, prise de masse, endurance, flexibilité, etc.)
+  // - Contraintes physiques (problèmes de dos, genou, etc.)
+  // - Équipement disponible (aucun, tapis, haltères, etc.)
+  // - Disponibilité hebdomadaire (jours sélectionnés par l'utilisateur)
+  // - Durée de séance préférée
+  // - Motivation principale
+  // - Historique sportif et niveau technique
+  // - Conditions de santé (IMC, fréquence cardiaque, fatigue, sommeil)
+  // Il génère un plan personnalisé en <1s au lieu de 3-5s pour l'IA OpenAI
   return generateWorkoutPlanRules(profile, extendedProfile);
 }
 
@@ -2098,7 +1873,7 @@ function calculateAge(birthdate, fallbackAge = null) {
   return fallbackAge;
 }
 
-// Construire le contexte utilisateur pour l'IA (FR-06)
+// Construire le contexte utilisateur pour l'IA (FR-06) - OPTIMISÉ pour être plus rapide
 function buildUserContext(profile = {}, extendedProfile = {}) {
   // Calculer l'IMC si disponible
   const computedBmi =
@@ -2107,61 +1882,36 @@ function buildUserContext(profile = {}, extendedProfile = {}) {
       ? Number((profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1))
       : null);
 
-  // Construire le contexte complet avec toutes les informations du profil
+  // Construire le contexte optimisé - UNIQUEMENT les informations essentielles saisies par l'utilisateur
+  // Ne pas inclure les champs null/vides pour réduire la taille du contexte
   const context = {
     basicProfile: {
-      name: profile.name || 'Utilisateur',
       age: calculateAge(profile.birthdate, profile.age),
-      weight: profile.weight || null,
-      height: profile.height || null,
       fitnessLevel: profile.fitness_level || 'beginner',
       primaryGoals: profile.goals || 'general',
       constraints: profile.constraints || ''
     },
-    physicalMetrics: {
-      bmi: computedBmi,
-      bodyComposition: extendedProfile.body_composition,
-      restingHeartRate: extendedProfile.resting_heart_rate,
-      bloodPressure: extendedProfile.blood_pressure,
-      waistCircumference: extendedProfile.waist_circumference,
-      hipCircumference: extendedProfile.hip_circumference,
-      armCircumference: extendedProfile.arm_circumference,
-      thighCircumference: extendedProfile.thigh_circumference
-    },
-    healthBackground: {
-      medicalHistory: extendedProfile.medical_history,
-      injuryHistory: extendedProfile.injury_history,
-      sleepQuality: extendedProfile.sleep_quality,
-      fatigueLevel: extendedProfile.fatigue_level,
-      dietType: extendedProfile.diet_type
-    },
     lifestyleHabits: {
-      weeklyAvailability: extendedProfile.weekly_availability,
-      preferredSessionDuration: extendedProfile.preferred_session_duration || 30,
-      trainingLocation: extendedProfile.training_location || 'home',
-      availableEquipment: extendedProfile.available_equipment || 'none',
-      dailySittingHours: extendedProfile.daily_sitting_hours
+      weeklyAvailability: extendedProfile?.weekly_availability || '',
+      preferredSessionDuration: extendedProfile?.preferred_session_duration || 30,
+      trainingLocation: extendedProfile?.training_location || 'home',
+      availableEquipment: extendedProfile?.available_equipment || 'none'
     },
     motivationAndPsychology: {
-      mainMotivation: extendedProfile.main_motivation || 'health',
-      coachingStylePreference: extendedProfile.coaching_style_preference,
-      demotivationFactors: extendedProfile.demotivation_factors,
-      engagementScore: extendedProfile.engagement_score,
-      socialPreference: extendedProfile.social_preference
-    },
-    sportsHistory: {
-      pastSports: extendedProfile.past_sports,
-      pastTrainingFrequency: extendedProfile.past_training_frequency,
-      timeSinceLastTraining: extendedProfile.time_since_last_training,
-      techniqueLevel: extendedProfile.technique_level
-    },
-    technicalPreferences: {
-      measurableGoals: extendedProfile.measurable_goals,
-      alertSensitivity: extendedProfile.alert_sensitivity,
-      cameraConsent: extendedProfile.camera_consent,
-      planningPreference: extendedProfile.planning_preference
+      mainMotivation: extendedProfile?.main_motivation || 'health'
     }
   };
+
+  // Ajouter uniquement les champs non vides pour optimiser
+  if (computedBmi) context.physicalMetrics = { bmi: computedBmi };
+  if (extendedProfile?.injury_history) {
+    if (!context.healthBackground) context.healthBackground = {};
+    context.healthBackground.injuryHistory = extendedProfile.injury_history;
+  }
+  if (extendedProfile?.past_sports) {
+    if (!context.sportsHistory) context.sportsHistory = {};
+    context.sportsHistory.pastSports = extendedProfile.past_sports;
+  }
 
   return sanitizeContextObject(context);
 }
@@ -3249,34 +2999,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Gestionnaire d'erreurs global (doit être après toutes les routes)
-app.use((err, req, res, next) => {
-  console.error('=== ERREUR SERVEUR NON GÉRÉE ===');
-  console.error('URL:', req.url);
-  console.error('Method:', req.method);
-  console.error('Error:', err);
-  console.error('Stack:', err.stack);
-  console.error('================================');
-  
-  // Ne pas exposer les détails de l'erreur en production
-  const errorMessage = process.env.NODE_ENV === 'development' 
-    ? err.message 
-    : 'Une erreur interne du serveur est survenue';
-  
-  res.status(500).json({ 
-    error: errorMessage,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+app.listen(PORT, () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
 });
-
-// Export pour Vercel (serverless)
-if (process.env.VERCEL) {
-  module.exports = app;
-} else {
-  // Démarrage local
-  app.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT}`);
-  });
-}
 
 

@@ -753,7 +753,8 @@ body.dark-mode .quick-action small {
     .form-group input[type="time"],
     .form-group .date-input,
     .form-group-date input[type="date"],
-    .form-group-date .date-input {
+    .form-group-date .date-input,
+    #profile-birthdate {
         padding: 0.875rem 1rem;
         font-size: 16px; /* Évite le zoom automatique sur iOS */
         min-height: 48px; /* Taille de touche recommandée */
@@ -765,22 +766,6 @@ body.dark-mode .quick-action small {
         border: 2px solid var(--border-color);
         border-radius: 8px;
         margin: 0;
-    }
-    
-    /* Champ date de naissance réduit sur mobile */
-    #profile-birthdate {
-        width: 70% !important;
-        max-width: 280px !important;
-        padding: 0.625rem 0.875rem !important;
-        font-size: 15px !important; /* Évite le zoom automatique sur iOS */
-        min-height: 40px !important;
-        max-height: 40px !important;
-        height: 40px !important;
-        box-sizing: border-box !important;
-        border: 2px solid var(--border-color) !important;
-        border-radius: 8px !important;
-        margin: 0;
-        line-height: 1.4;
     }
     
     .form-group select {
@@ -1143,7 +1128,8 @@ body.dark-mode .quick-action small {
 }
 
 .form-group-date input[type="date"],
-.form-group-date .date-input {
+.form-group-date .date-input,
+#profile-birthdate {
     width: 100% !important;
     max-width: 100% !important;
     padding: 0.875rem 1rem !important;
@@ -1160,27 +1146,6 @@ body.dark-mode .quick-action small {
     transition: all 0.3s ease;
     box-sizing: border-box !important;
     line-height: 1.5;
-    margin: 0;
-}
-
-/* Champ date de naissance réduit */
-#profile-birthdate {
-    width: 70% !important;
-    max-width: 280px !important;
-    padding: 0.625rem 0.875rem !important;
-    font-size: 0.9rem !important;
-    min-height: 40px !important;
-    max-height: 40px !important;
-    height: 40px !important;
-    cursor: pointer;
-    border: 2px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    background: var(--bg-color) !important;
-    color: var(--text-color) !important;
-    font-family: inherit;
-    transition: all 0.3s ease;
-    box-sizing: border-box !important;
-    line-height: 1.4;
     margin: 0;
 }
 
@@ -3535,7 +3500,7 @@ label {
 .workflow-message {
     background: linear-gradient(135deg, var(--primary-color), #4CAF50);
     color: white;
-    padding: 0.5rem 1rem;
+    padding: 1rem;
     margin-bottom: 1rem;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -3553,17 +3518,6 @@ label {
     }
 }
 
-@keyframes slideUp {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-}
-
 .workflow-message-content {
     display: flex;
     align-items: center;
@@ -3573,8 +3527,8 @@ label {
 
 .workflow-message-text {
     flex: 1;
-    font-size: 0.9rem;
-    line-height: 1.4;
+    font-size: 1rem;
+    line-height: 1.5;
 }
 
 .workflow-message-close {

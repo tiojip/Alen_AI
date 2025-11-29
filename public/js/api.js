@@ -20,48 +20,57 @@ class API {
         try {
             const response = await fetch(url, config);
             
-            // Lire le body une seule fois (ne peut être lu qu'une fois)
-            const contentType = response.headers.get('content-type');
-            const isJson = contentType && contentType.includes('application/json');
-            
-            let responseText = '';
-            let data = null;
-            
-            try {
-                responseText = await response.text();
-                
-                // Parser JSON si c'est du JSON
-                if (isJson && responseText) {
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (parseError) {
-                        // Si le parsing JSON échoue, utiliser le texte brut
-                        console.error('Erreur parsing JSON:', parseError);
-                        data = { error: responseText || 'Réponse invalide du serveur' };
-                    }
-                } else if (responseText) {
-                    // Si ce n'est pas du JSON, créer un objet avec le message
-                    data = { message: responseText };
-                } else {
-                    data = {};
-                }
-            } catch (readError) {
-                // Erreur lors de la lecture du body
-                console.error('Erreur lecture réponse:', readError);
-                throw new Error('Impossible de lire la réponse du serveur');
-            }
-            
             // Gérer les erreurs d'authentification
             if (response.status === 401 || response.status === 403) {
                 this.setToken(null);
-                const errorMessage = data?.error || data?.message || 'Session expirée. Veuillez vous reconnecter.';
+                // Lire le message d'erreur avant de throw
+                let errorMessage = 'Session expirée. Veuillez vous reconnecter.';
+                try {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const text = await response.text();
+                        if (text) {
+                            const errorData = JSON.parse(text);
+                            errorMessage = errorData.error || errorMessage;
+                        }
+                    } else {
+                        const text = await response.text();
+                        if (text && text !== 'Unauthorized' && text.trim()) {
+                            errorMessage = text;
+                        }
+                    }
+                } catch (e) {
+                    // Ignorer les erreurs de parsing pour les 401/403
+                }
                 throw new Error(errorMessage);
             }
+
+            // Essayer de parser JSON
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                try {
+                    const text = await response.text();
+                    if (text) {
+                        data = JSON.parse(text);
+                    } else {
+                        data = {};
+                    }
+                } catch (parseError) {
+                    // Si le parsing JSON échoue, c'est probablement une erreur serveur
+                    throw new Error('Réponse invalide du serveur');
+                }
+            } else {
+                // Si ce n'est pas du JSON, lire comme texte
+                const text = await response.text();
+                if (!response.ok) {
+                    throw new Error(text || 'Erreur API');
+                }
+                return { message: text };
+            }
             
-            // Gérer les autres erreurs HTTP
             if (!response.ok) {
-                const errorMessage = data?.error || data?.message || responseText || 'Erreur serveur';
-                throw new Error(errorMessage);
+                throw new Error(data.error || data.message || 'Erreur API');
             }
             
             return data;
