@@ -335,20 +335,28 @@ app.post('/api/auth/register', async (req, res) => {
           if (err.message.includes('UNIQUE')) {
             return res.status(400).json({ error: 'Email déjà utilisé' });
           }
-          return res.status(500).json({ error: err.message });
+          console.error('Erreur lors de l\'insertion de l\'utilisateur:', err);
+          return res.status(500).json({ error: 'Erreur lors de la création du compte. Veuillez réessayer.' });
         }
 
         const userId = this.lastID;
         const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '30d' });
 
-        // Créer les préférences par défaut
-        db.run('INSERT INTO preferences (user_id) VALUES (?)', [userId]);
-
-        res.json({ token, user: { id: userId, email, name } });
+        // Créer les préférences par défaut avec gestion d'erreur
+        db.run('INSERT INTO preferences (user_id) VALUES (?)', [userId], (prefErr) => {
+          if (prefErr) {
+            // Log l'erreur mais ne bloque pas l'inscription
+            console.error('Erreur lors de la création des préférences par défaut:', prefErr);
+            // Les préférences peuvent être créées plus tard, l'inscription est réussie
+          }
+          // Répondre avec succès même si les préférences n'ont pas pu être créées
+          res.json({ token, user: { id: userId, email, name: name || '' } });
+        });
       }
     );
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Erreur lors de l\'inscription:', error);
+    res.status(500).json({ error: 'Erreur serveur lors de l\'inscription. Veuillez réessayer.' });
   }
 });
 
