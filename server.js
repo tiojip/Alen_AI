@@ -2908,19 +2908,37 @@ app.post('/api/session/advice', authenticateToken, async (req, res) => {
       const OpenAI = require('openai');
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
-      // Construire le prompt contextuel
-      const contextPrompt = `Tu es un coach sportif expert. Après une séance d'entraînement de ${Math.floor(duration / 60)} minutes avec un score postural de ${postureScore}/100, donne 3 conseils personnalisés et concis pour améliorer la progression.`;
+      // Récupérer les exercices effectués
+      const exercises = sessionData.workout?.exercises || [];
+      const exercisesNames = exercises.map(ex => ex.name || ex).filter(Boolean).join(', ');
+      const exercisesInfo = exercisesNames ? `Exercices effectués: ${exercisesNames}.` : '';
       
-      let userPrompt = `Niveau: ${level}. Objectifs: ${goals}.`;
+      // Construire le prompt contextuel amélioré avec score postural et exercices
+      const contextPrompt = `Tu es un coach sportif expert. Après une séance d'entraînement de ${Math.floor(duration / 60)} minutes avec un score postural de ${postureScore}/100, donne 3 conseils personnalisés et concis pour améliorer la progression. Utilise le score postural (${postureScore}/100) pour donner des recommandations spécifiques sur la posture et la technique d'exécution.`;
+      
+      let userPrompt = `Niveau: ${level}. Objectifs: ${goals}. ${exercisesInfo}`;
       if (extendedProfile?.main_motivation) {
         userPrompt += ` Motivation: ${extendedProfile.main_motivation}.`;
       }
+      
+      // Analyser les données posturales pour des conseils plus précis
       if (sessionData.postureData && sessionData.postureData.length > 0) {
         const errors = sessionData.postureData.flatMap(d => d.errors || []).filter(Boolean);
         if (errors.length > 0) {
           const uniqueErrors = [...new Set(errors)];
           userPrompt += ` Erreurs posturales détectées: ${uniqueErrors.join(', ')}.`;
         }
+        
+        // Calculer le score moyen par exercice si possible
+        const avgScore = sessionData.postureData.reduce((sum, d) => sum + (d.score || 0), 0) / sessionData.postureData.length;
+        if (avgScore < postureScore - 5 || avgScore > postureScore + 5) {
+          userPrompt += ` Score postural moyen pendant l'exécution: ${Math.round(avgScore)}/100.`;
+        }
+      }
+      
+      // Ajouter des informations sur les exercices pour des conseils spécifiques
+      if (exercises.length > 0) {
+        userPrompt += ` Concentre-toi particulièrement sur les conseils de posture pour ces exercices: ${exercisesNames}.`;
       }
       
       // Timeout de 2.5s pour respecter le SLA ≤3s

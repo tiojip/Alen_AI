@@ -361,6 +361,94 @@ function getPrimaryFeedback(feedback = []) {
     return priority;
 }
 
+// Générer un conseil postural dynamique selon l'exercice en cours
+function getExerciseSpecificPostureAdvice(exerciseName, score, feedback = []) {
+    if (!exerciseName) {
+        return null;
+    }
+    
+    const exerciseLower = exerciseName.toLowerCase();
+    const hasHighSeverity = feedback.some(f => f.severity === 'high');
+    const hasMediumSeverity = feedback.some(f => f.severity === 'medium');
+    
+    // Conseils spécifiques par exercice
+    const exerciseAdvice = {
+        'squat': {
+            good: 'Gardez le dos droit et les genoux alignés avec les chevilles.',
+            medium: 'Pliez les genoux en gardant les talons au sol. Évitez de pencher le buste en avant.',
+            poor: 'Corrigez: dos droit, genoux alignés avec chevilles, talons au sol.'
+        },
+        'squats': {
+            good: 'Gardez le dos droit et les genoux alignés avec les chevilles.',
+            medium: 'Pliez les genoux en gardant les talons au sol. Évitez de pencher le buste en avant.',
+            poor: 'Corrigez: dos droit, genoux alignés avec chevilles, talons au sol.'
+        },
+        'push-up': {
+            good: 'Corps aligné de la tête aux pieds, abdos gainés.',
+            medium: 'Gardez le dos droit, évitez de creuser le dos ou de lever les hanches.',
+            poor: 'Corrigez: alignement tête-épaules-hanches, abdos contractés.'
+        },
+        'push-ups': {
+            good: 'Corps aligné de la tête aux pieds, abdos gainés.',
+            medium: 'Gardez le dos droit, évitez de creuser le dos ou de lever les hanches.',
+            poor: 'Corrigez: alignement tête-épaules-hanches, abdos contractés.'
+        },
+        'planche': {
+            good: 'Alignement parfait tête-épaules-hanches, respiration régulière.',
+            medium: 'Maintenez l\'alignement, contractez les abdos et respirez calmement.',
+            poor: 'Corrigez: alignement strict, abdos gainés, ne creusez pas le dos.'
+        },
+        'plank': {
+            good: 'Alignement parfait tête-épaules-hanches, respiration régulière.',
+            medium: 'Maintenez l\'alignement, contractez les abdos et respirez calmement.',
+            poor: 'Corrigez: alignement strict, abdos gainés, ne creusez pas le dos.'
+        },
+        'fente': {
+            good: 'Genou avant aligné avec la cheville, dos droit.',
+            medium: 'Grand pas en avant, genou avant à 90°, dos vertical.',
+            poor: 'Corrigez: genou avant aligné avec cheville, dos droit, pas assez grand.'
+        },
+        'fentes': {
+            good: 'Genou avant aligné avec la cheville, dos droit.',
+            medium: 'Grand pas en avant, genou avant à 90°, dos vertical.',
+            poor: 'Corrigez: genou avant aligné avec cheville, dos droit, pas assez grand.'
+        },
+        'lunge': {
+            good: 'Genou avant aligné avec la cheville, dos droit.',
+            medium: 'Grand pas en avant, genou avant à 90°, dos vertical.',
+            poor: 'Corrigez: genou avant aligné avec cheville, dos droit, pas assez grand.'
+        }
+    };
+    
+    // Trouver le conseil approprié pour cet exercice
+    let advice = null;
+    for (const [key, value] of Object.entries(exerciseAdvice)) {
+        if (exerciseLower.includes(key)) {
+            if (score >= 75 && !hasHighSeverity && !hasMediumSeverity) {
+                advice = value.good;
+            } else if (score >= 60 || (hasMediumSeverity && !hasHighSeverity)) {
+                advice = value.medium;
+            } else {
+                advice = value.poor;
+            }
+            break;
+        }
+    }
+    
+    // Si aucun conseil spécifique trouvé, utiliser un conseil générique basé sur le score
+    if (!advice) {
+        if (score >= 75) {
+            advice = 'Maintenez une posture correcte et contrôlée.';
+        } else if (score >= 60) {
+            advice = 'Concentrez-vous sur l\'alignement et la forme.';
+        } else {
+            advice = 'Corrigez votre posture avant de continuer.';
+        }
+    }
+    
+    return advice;
+}
+
 function renderPostureOverlay(ctx, width, height, analysis) {
     const score = analysis?.score ?? overlayLastScore;
     const feedback = analysis?.feedback ?? overlayLastFeedback;
@@ -374,6 +462,10 @@ function renderPostureOverlay(ctx, width, height, analysis) {
     if (score === null || score === undefined) {
         return;
     }
+
+    // Récupérer l'exercice en cours
+    const currentExerciseName = document.getElementById('current-exercise-name')?.textContent || 
+                                window.currentExerciseName || null;
 
     ctx.save();
 
@@ -397,7 +489,13 @@ function renderPostureOverlay(ctx, width, height, analysis) {
     
     ctx.restore();
 
-    if (primaryFeedback) {
+    // Générer le conseil postural dynamique selon l'exercice
+    const exerciseAdvice = getExerciseSpecificPostureAdvice(currentExerciseName, score, feedback);
+    const adviceMessage = primaryFeedback 
+        ? primaryFeedback.message.replace(/^[⚠️💡✓ ]+/g, '')
+        : (exerciseAdvice || 'Maintenez une posture correcte.');
+
+    if (primaryFeedback || exerciseAdvice) {
         const feedbackHeight = 90;
         const yStart = height - feedbackHeight - 24;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
@@ -413,8 +511,7 @@ function renderPostureOverlay(ctx, width, height, analysis) {
         ctx.fillText('Conseil posture', 32, yStart + 34);
 
         ctx.font = '400 15px "Inter", Arial, sans-serif';
-        const message = primaryFeedback.message.replace(/^[⚠️💡✓ ]+/g, '');
-        wrapCanvasText(ctx, message, 32, yStart + 60, width - 64, 22);
+        wrapCanvasText(ctx, adviceMessage, 32, yStart + 60, width - 64, 22);
         
         ctx.restore();
     } else {

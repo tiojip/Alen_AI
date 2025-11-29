@@ -712,6 +712,9 @@ async function startExercise() {
 
     document.getElementById('current-exercise-name').textContent = exerciseData.name;
     
+    // Stocker le nom de l'exercice pour les conseils posturaux dynamiques
+    window.currentExerciseName = exerciseData.name;
+    
     const feedbackBox = document.getElementById('workout-feedback');
     if (feedbackBox) {
         const instructions = getExerciseInstructions(exerciseData);
