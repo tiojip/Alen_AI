@@ -1005,12 +1005,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Recharger le dashboard pour mettre à jour les informations
             await loadDashboard();
 
-            if (typeof advanceWorkflow === 'function') {
-                setTimeout(() => {
-                    advanceWorkflow();
-                }, 300);
-            }
-
             btn.textContent = 'Génération du plan...';
 
             const profile = await api.getProfile();
@@ -1020,26 +1014,55 @@ document.addEventListener('DOMContentLoaded', () => {
             const generationTime = Date.now() - startTime;
             const slaMet = generationTime <= 5000;
 
-            btn.textContent = originalText;
-            btn.disabled = false;
-
+            // Charger le plan depuis le serveur (au cas où il n'est pas dans la réponse)
+            let plan = null;
             if (data && data.plan) {
+                plan = data.plan;
+            } else {
+                // Si le plan n'est pas dans la réponse, le charger depuis le serveur
+                try {
+                    const planData = await api.getPlan();
+                    if (planData && planData.plan) {
+                        plan = planData.plan;
+                    }
+                } catch (error) {
+                    console.error('Erreur lors du chargement du plan:', error);
+                }
+            }
+
+            // Si on a un plan, afficher la page workout
+            if (plan) {
                 showPage('workout');
                 if (typeof displayWorkoutPlan === 'function') {
-                    await displayWorkoutPlan(data.plan);
+                    await displayWorkoutPlan(plan);
                 } else {
+                    // Attendre un peu et réessayer
                     setTimeout(async () => {
-                        const plan = await loadWorkoutPlan();
-                        if (plan && typeof displayWorkoutPlan === 'function') {
+                        if (typeof displayWorkoutPlan === 'function') {
                             await displayWorkoutPlan(plan);
+                        } else if (typeof loadWorkoutPlan === 'function') {
+                            const loadedPlan = await loadWorkoutPlan();
+                            if (loadedPlan && typeof displayWorkoutPlan === 'function') {
+                                await displayWorkoutPlan(loadedPlan);
+                            }
                         }
-                    }, 100);
+                    }, 200);
+                }
+                
+                // Avancer le workflow après avoir affiché le plan
+                if (typeof advanceWorkflow === 'function') {
+                    setTimeout(() => {
+                        advanceWorkflow();
+                    }, 500);
                 }
             } else {
-                alert(`Profil enregistré et plan généré en ${generationTime}ms ! ${slaMet ? '✅' : '⚠️'}`);
-                // Recharger le dashboard pour afficher les nouvelles informations
-                await loadDashboard();
+                // Si aucun plan n'a pu être chargé, afficher un message d'erreur
+                alert(`Erreur: Impossible de générer le plan d'entraînement. Veuillez réessayer.`);
+                console.error('Aucun plan généré:', data);
             }
+
+            btn.textContent = originalText;
+            btn.disabled = false;
         } catch (error) {
             console.error('Erreur sauvegarde profil complet:', error);
             alert('Erreur: ' + (error?.message || 'Impossible de sauvegarder le profil'));
