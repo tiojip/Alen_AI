@@ -74,9 +74,70 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
   }
 });
 
+// Variable pour suivre l'état d'initialisation
+let dbInitialized = false;
+let dbInitializing = false;
+
 // Initialisation des tables
 function initDatabase() {
+  if (dbInitializing) {
+    console.log('Base de données déjà en cours d\'initialisation...');
+    return;
+  }
+  if (dbInitialized) {
+    console.log('Base de données déjà initialisée');
+    return;
+  }
+  
+  dbInitializing = true;
+  console.log('Début de l\'initialisation de la base de données...');
+  
   db.serialize(() => {
+    // Table utilisateurs (doit être créée en premier)
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      name TEXT,
+      age INTEGER,
+      birthdate TEXT,
+      weight REAL,
+      height REAL,
+      fitness_level TEXT,
+      goals TEXT,
+      constraints TEXT,
+      consent_date DATETIME,
+      consent_version TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Erreur création table users:', err);
+      } else {
+        console.log('Table users créée/vérifiée');
+      }
+    });
+    
+    // Table préférences (doit être créée avant les migrations)
+    db.run(`CREATE TABLE IF NOT EXISTS preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER UNIQUE NOT NULL,
+      dark_mode INTEGER DEFAULT 0,
+      weight_unit TEXT DEFAULT 'kg',
+      height_unit TEXT DEFAULT 'cm',
+      language TEXT DEFAULT 'fr',
+      sounds INTEGER DEFAULT 1,
+      notifications INTEGER DEFAULT 1,
+      notification_time TEXT,
+      notification_days TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`, (err) => {
+      if (err) {
+        console.error('Erreur création table preferences:', err);
+      } else {
+        console.log('Table preferences créée/vérifiée');
+      }
+    });
+    
     // Migration: Ajouter les colonnes manquantes pour FR-06
     db.run(`ALTER TABLE workout_plans ADD COLUMN version TEXT`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
@@ -122,24 +183,6 @@ function initDatabase() {
         console.error('Erreur migration notification_days:', err);
       }
     });
-    
-    // Table utilisateurs (avec champs consentement Loi 25)
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT,
-      age INTEGER,
-      birthdate TEXT,
-      weight REAL,
-      height REAL,
-      fitness_level TEXT,
-      goals TEXT,
-      constraints TEXT,
-      consent_date DATETIME,
-      consent_version TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
     
     // Migration: Ajouter la colonne birthdate si elle n'existe pas
     db.run(`ALTER TABLE users ADD COLUMN birthdate TEXT`, (err) => {
@@ -294,8 +337,45 @@ function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       used_at DATETIME,
       FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
+    )`, (err) => {
+      if (err) {
+        console.error('Erreur création table password_reset_tokens:', err);
+      } else {
+        console.log('Table password_reset_tokens créée/vérifiée');
+      }
+      // Marquer l'initialisation comme terminée
+      dbInitialized = true;
+      dbInitializing = false;
+      console.log('Initialisation de la base de données terminée');
+    });
   });
+}
+
+// Middleware pour s'assurer que la base de données est initialisée
+function ensureDatabaseReady(req, res, next) {
+  if (!dbInitialized && !dbInitializing) {
+    console.log('Base de données non initialisée, initialisation...');
+    initDatabase();
+  }
+  // Attendre un peu si l'initialisation est en cours
+  if (dbInitializing) {
+    const checkReady = setInterval(() => {
+      if (dbInitialized) {
+        clearInterval(checkReady);
+        next();
+      }
+    }, 50);
+    // Timeout après 5 secondes
+    setTimeout(() => {
+      clearInterval(checkReady);
+      if (!dbInitialized) {
+        console.error('Timeout: Base de données non initialisée après 5 secondes');
+        return res.status(503).json({ error: 'Service temporairement indisponible. Veuillez réessayer.' });
+      }
+    }, 5000);
+  } else {
+    next();
+  }
 }
 
 // Middleware d'authentification
@@ -317,45 +397,68 @@ function authenticateToken(req, res, next) {
 }
 
 // Routes d'authentification
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', ensureDatabaseReady, async (req, res) => {
+  console.log('=== Début inscription ===');
   const { email, password, name } = req.body;
+  console.log('Données reçues:', { email, hasPassword: !!password, name });
 
   if (!email || !password) {
+    console.log('Validation échouée: email ou mot de passe manquant');
     return res.status(400).json({ error: 'Email et mot de passe requis' });
   }
 
   try {
+    console.log('Hachage du mot de passe...');
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('Mot de passe haché avec succès');
     
+    console.log('Insertion dans la base de données...');
     db.run(
       'INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
       [email, hashedPassword, name || ''],
       function(err) {
         if (err) {
-          if (err.message.includes('UNIQUE')) {
+          console.error('Erreur DB lors de l\'insertion:', err.message, err.code);
+          if (err.message.includes('UNIQUE') || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
             return res.status(400).json({ error: 'Email déjà utilisé' });
           }
-          console.error('Erreur lors de l\'insertion de l\'utilisateur:', err);
+          // Vérifier si c'est une erreur de table inexistante
+          if (err.message.includes('no such table') || err.message.includes('SQLITE_ERROR')) {
+            console.error('Table users n\'existe pas, initialisation de la base...');
+            initDatabase();
+            return res.status(500).json({ error: 'Base de données en cours d\'initialisation. Veuillez réessayer dans quelques secondes.' });
+          }
           return res.status(500).json({ error: 'Erreur lors de la création du compte. Veuillez réessayer.' });
         }
 
         const userId = this.lastID;
-        const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '30d' });
+        console.log('Utilisateur créé avec ID:', userId);
+        
+        try {
+          const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '30d' });
+          console.log('Token JWT généré');
 
-        // Créer les préférences par défaut avec gestion d'erreur
-        db.run('INSERT INTO preferences (user_id) VALUES (?)', [userId], (prefErr) => {
-          if (prefErr) {
-            // Log l'erreur mais ne bloque pas l'inscription
-            console.error('Erreur lors de la création des préférences par défaut:', prefErr);
-            // Les préférences peuvent être créées plus tard, l'inscription est réussie
-          }
-          // Répondre avec succès même si les préférences n'ont pas pu être créées
-          res.json({ token, user: { id: userId, email, name: name || '' } });
-        });
+          // Créer les préférences par défaut avec gestion d'erreur
+          db.run('INSERT INTO preferences (user_id) VALUES (?)', [userId], (prefErr) => {
+            if (prefErr) {
+              // Log l'erreur mais ne bloque pas l'inscription
+              console.error('Erreur lors de la création des préférences par défaut:', prefErr.message);
+              // Les préférences peuvent être créées plus tard, l'inscription est réussie
+            } else {
+              console.log('Préférences par défaut créées');
+            }
+            // Répondre avec succès même si les préférences n'ont pas pu être créées
+            console.log('=== Inscription réussie ===');
+            res.json({ token, user: { id: userId, email, name: name || '' } });
+          });
+        } catch (tokenError) {
+          console.error('Erreur génération token:', tokenError);
+          return res.status(500).json({ error: 'Erreur lors de la génération du token. Veuillez réessayer.' });
+        }
       }
     );
   } catch (error) {
-    console.error('Erreur lors de l\'inscription:', error);
+    console.error('Erreur exception lors de l\'inscription:', error);
     res.status(500).json({ error: 'Erreur serveur lors de l\'inscription. Veuillez réessayer.' });
   }
 });
