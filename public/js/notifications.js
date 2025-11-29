@@ -62,6 +62,13 @@ async function requestNotificationPermission() {
 
 // Initialiser les notifications (FR-13)
 async function initNotifications() {
+    // Vérifier si l'utilisateur est connecté
+    const token = localStorage.getItem('token');
+    if (!token) {
+        console.log('Utilisateur non connecté, notifications non initialisées');
+        return;
+    }
+    
     // Enregistrer le Service Worker
     await registerServiceWorker();
     
@@ -73,7 +80,9 @@ async function initNotifications() {
             return; // Notifications désactivées
         }
     } catch (error) {
-        console.error('Erreur chargement préférences:', error);
+        // Ne pas bloquer l'initialisation si les préférences ne peuvent pas être chargées
+        console.warn('Impossible de charger les préférences, utilisation des valeurs par défaut:', error.message);
+        // Continuer avec les notifications activées par défaut
     }
 
     // Demander la permission

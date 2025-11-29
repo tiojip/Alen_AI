@@ -711,11 +711,26 @@ app.put('/api/user/profile/extended', authenticateToken, (req, res) => {
 });
 
 // Routes préférences
-app.get('/api/user/preferences', authenticateToken, (req, res) => {
+app.get('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, res) => {
+  console.log('Récupération des préférences pour user_id:', req.user.id);
   db.get('SELECT * FROM preferences WHERE user_id = ?', [req.user.id], (err, prefs) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      console.error('Erreur lors de la récupération des préférences:', err.message, err.code);
+      // Si la table n'existe pas, retourner les valeurs par défaut
+      if (err.message.includes('no such table') || err.code === 'SQLITE_ERROR') {
+        console.log('Table preferences n\'existe pas, retour des valeurs par défaut');
+        return res.json({ 
+          dark_mode: 0, 
+          weight_unit: 'kg', 
+          height_unit: 'cm', 
+          language: 'fr',
+          sounds: 1, 
+          notifications: 1 
+        });
+      }
+      return res.status(500).json({ error: 'Erreur lors de la récupération des préférences' });
     }
+    console.log('Préférences récupérées:', prefs ? 'trouvées' : 'non trouvées, valeurs par défaut');
     res.json(prefs || { 
       dark_mode: 0, 
       weight_unit: 'kg', 
@@ -727,8 +742,9 @@ app.get('/api/user/preferences', authenticateToken, (req, res) => {
   });
 });
 
-app.put('/api/user/preferences', authenticateToken, (req, res) => {
+app.put('/api/user/preferences', ensureDatabaseReady, authenticateToken, (req, res) => {
   const { dark_mode, weight_unit, height_unit, language, sounds, notifications, notification_time, notification_days } = req.body;
+  console.log('Mise à jour des préférences pour user_id:', req.user.id);
   
   // Convertir notification_days en JSON si c'est un tableau
   const notificationDaysStr = notification_days ? 
@@ -750,8 +766,16 @@ app.put('/api/user/preferences', authenticateToken, (req, res) => {
     [req.user.id, dark_mode ? 1 : 0, weight_unit || 'kg', height_unit || 'cm', language || 'fr', sounds ? 1 : 0, notifications ? 1 : 0, notification_time || null, notificationDaysStr],
     (err) => {
       if (err) {
-        return res.status(500).json({ error: err.message });
+        console.error('Erreur lors de la mise à jour des préférences:', err.message, err.code);
+        // Si la table n'existe pas, initialiser la base et retourner une erreur
+        if (err.message.includes('no such table') || err.code === 'SQLITE_ERROR') {
+          console.log('Table preferences n\'existe pas, initialisation de la base...');
+          initDatabase();
+          return res.status(503).json({ error: 'Base de données en cours d\'initialisation. Veuillez réessayer dans quelques secondes.' });
+        }
+        return res.status(500).json({ error: 'Erreur lors de la mise à jour des préférences' });
       }
+      console.log('Préférences mises à jour avec succès');
       res.json({ message: 'Préférences mises à jour' });
     }
   );
