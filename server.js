@@ -765,9 +765,24 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
       });
     });
     
-    // Génération rapide du plan personnalisé (utilise toutes les informations du profil)
-    // Le moteur de règles est optimisé et utilise: niveau, objectifs, contraintes, équipement, 
-    // disponibilité hebdomadaire, durée préférée, motivation, historique sportif, etc.
+    // Log pour vérifier que les données sont bien récupérées
+    console.log('Génération plan - Profil de base:', {
+      name: profile.name,
+      age: calculateAge(profile.birthdate, profile.age),
+      fitness_level: profile.fitness_level,
+      goals: profile.goals,
+      constraints: profile.constraints
+    });
+    if (extendedProfile) {
+      console.log('Génération plan - Profil étendu disponible:', {
+        available_equipment: extendedProfile.available_equipment,
+        preferred_session_duration: extendedProfile.preferred_session_duration,
+        main_motivation: extendedProfile.main_motivation,
+        weekly_availability: extendedProfile.weekly_availability
+      });
+    }
+    
+    // Génération améliorée avec IA (FR-06) - SLA ≤5s
     const plan = await generateWorkoutPlanAI(profile, extendedProfile, startTime);
     const generationTime = Date.now() - startTime;
     
@@ -1124,48 +1139,63 @@ app.post('/api/workout/plan/rollback', authenticateToken, (req, res) => {
 // Base de données d'exercices enrichie (FR-06)
 const EXERCISE_DATABASE = {
   beginner: [
-    { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 1 },
-    { name: 'Push-ups (genoux)', sets: 2, reps: 8, rest: 60, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 1 },
-    { name: 'Planche', sets: 3, duration: 20, rest: 60, muscles: ['Abdominaux', 'Épaules'], equipment: 'mat', difficulty: 2 },
-    { name: 'Fentes', sets: 2, reps: 8, rest: 60, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 1 },
-    { name: 'Pompes inclinées', sets: 2, reps: 8, rest: 60, muscles: ['Pectoraux', 'Triceps'], equipment: 'chair', difficulty: 1 },
-    { name: 'Gainage latéral', sets: 2, duration: 15, rest: 60, muscles: ['Abdominaux'], equipment: 'mat', difficulty: 1 }
+    { name: 'Squats', sets: 3, reps: 10, duration: 10, rest: 5, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 1 },
+    { name: 'Push-ups (genoux)', sets: 2, reps: 8, duration: 10, rest: 5, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 1 },
+    { name: 'Planche', sets: 3, duration: 10, rest: 5, muscles: ['Abdominaux', 'Épaules'], equipment: 'mat', difficulty: 2 },
+    { name: 'Fentes', sets: 2, reps: 8, duration: 10, rest: 5, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 1 },
+    { name: 'Pompes inclinées', sets: 2, reps: 8, duration: 10, rest: 5, muscles: ['Pectoraux', 'Triceps'], equipment: 'chair', difficulty: 1 },
+    { name: 'Gainage latéral', sets: 2, duration: 10, rest: 5, muscles: ['Abdominaux'], equipment: 'mat', difficulty: 1 }
   ],
   intermediate: [
-    { name: 'Squats', sets: 4, reps: 12, rest: 45, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 2 },
-    { name: 'Push-ups', sets: 3, reps: 12, rest: 45, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 2 },
-    { name: 'Planche', sets: 3, duration: 30, rest: 45, muscles: ['Abdominaux', 'Épaules'], equipment: 'mat', difficulty: 2 },
-    { name: 'Fentes', sets: 3, reps: 12, rest: 45, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 2 },
-    { name: 'Burpees', sets: 2, reps: 8, rest: 60, muscles: ['Tout le corps'], equipment: 'none', difficulty: 3 },
-    { name: 'Mountain Climbers', sets: 3, duration: 30, rest: 30, muscles: ['Cardio'], equipment: 'mat', difficulty: 2 },
-    { name: 'Pompes diamant', sets: 3, reps: 10, rest: 45, muscles: ['Triceps'], equipment: 'none', difficulty: 3 }
+    { name: 'Squats', sets: 4, reps: 12, duration: 10, rest: 5, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 2 },
+    { name: 'Push-ups', sets: 3, reps: 12, duration: 10, rest: 5, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 2 },
+    { name: 'Planche', sets: 3, duration: 10, rest: 5, muscles: ['Abdominaux', 'Épaules'], equipment: 'mat', difficulty: 2 },
+    { name: 'Fentes', sets: 3, reps: 12, duration: 10, rest: 5, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 2 },
+    { name: 'Burpees', sets: 2, reps: 8, duration: 10, rest: 5, muscles: ['Tout le corps'], equipment: 'none', difficulty: 3 },
+    { name: 'Mountain Climbers', sets: 3, duration: 10, rest: 5, muscles: ['Cardio'], equipment: 'mat', difficulty: 2 },
+    { name: 'Pompes diamant', sets: 3, reps: 10, duration: 10, rest: 5, muscles: ['Triceps'], equipment: 'none', difficulty: 3 }
   ],
   advanced: [
-    { name: 'Squats', sets: 4, reps: 15, rest: 30, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 3 },
-    { name: 'Push-ups', sets: 4, reps: 15, rest: 30, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 3 },
-    { name: 'Planche', sets: 4, duration: 45, rest: 30, muscles: ['Abdominaux', 'Épaules'], equipment: 'mat', difficulty: 3 },
-    { name: 'Fentes sautées', sets: 3, reps: 12, rest: 45, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 4 },
-    { name: 'Burpees', sets: 3, reps: 12, rest: 45, muscles: ['Tout le corps'], equipment: 'none', difficulty: 4 },
-    { name: 'Pompes sur une main', sets: 2, reps: 5, rest: 60, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 5 },
-    { name: 'Planche dynamique', sets: 3, reps: 10, rest: 30, muscles: ['Abdominaux'], equipment: 'mat', difficulty: 4 }
+    { name: 'Squats', sets: 4, reps: 15, duration: 10, rest: 5, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 3 },
+    { name: 'Push-ups', sets: 4, reps: 15, duration: 10, rest: 5, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 3 },
+    { name: 'Planche', sets: 4, duration: 10, rest: 5, muscles: ['Abdominaux', 'Épaules'], equipment: 'mat', difficulty: 3 },
+    { name: 'Fentes sautées', sets: 3, reps: 12, duration: 10, rest: 5, muscles: ['Quadriceps', 'Fessiers'], equipment: 'none', difficulty: 4 },
+    { name: 'Burpees', sets: 3, reps: 12, duration: 10, rest: 5, muscles: ['Tout le corps'], equipment: 'none', difficulty: 4 },
+    { name: 'Pompes sur une main', sets: 2, reps: 5, duration: 10, rest: 5, muscles: ['Pectoraux', 'Triceps'], equipment: 'none', difficulty: 5 },
+    { name: 'Planche dynamique', sets: 3, reps: 10, duration: 10, rest: 5, muscles: ['Abdominaux'], equipment: 'mat', difficulty: 4 }
   ]
 };
 
-// Fonction de génération de plan optimisée - Utilise le moteur de règles en priorité (rapide)
-// Le moteur de règles utilise TOUTES les informations du profil utilisateur et est beaucoup plus rapide (<1s)
+// Fonction de génération de plan améliorée avec IA (FR-06) - SLA ≤5s
 async function generateWorkoutPlanAI(profile, extendedProfile, startTime) {
-  // OPTIMISATION: Utiliser le moteur de règles en priorité car il est rapide (<1s) et utilise TOUTES les infos du profil
-  // Le moteur de règles prend en compte TOUTES les informations saisies par l'utilisateur:
-  // - Niveau de forme physique (beginner/intermediate/advanced)
-  // - Objectifs (perte de poids, prise de masse, endurance, flexibilité, etc.)
-  // - Contraintes physiques (problèmes de dos, genou, etc.)
-  // - Équipement disponible (aucun, tapis, haltères, etc.)
-  // - Disponibilité hebdomadaire (jours sélectionnés par l'utilisateur)
-  // - Durée de séance préférée
-  // - Motivation principale
-  // - Historique sportif et niveau technique
-  // - Conditions de santé (IMC, fréquence cardiaque, fatigue, sommeil)
-  // Il génère un plan personnalisé en <1s au lieu de 3-5s pour l'IA OpenAI
+  const MAX_GENERATION_TIME = 5000; // objectif SLA
+
+  if (!HAS_OPENAI_KEY) {
+    console.warn('Aucune clé API OpenAI détectée, utilisation du moteur de règles');
+    return generateWorkoutPlanRules(profile, extendedProfile);
+  }
+
+  const elapsed = Date.now() - startTime;
+  const remaining = MAX_GENERATION_TIME - elapsed;
+
+  if (remaining <= 600) {
+    console.warn('Temps insuffisant pour appeler l’IA, utilisation du moteur de règles');
+    return generateWorkoutPlanRules(profile, extendedProfile);
+  }
+
+  try {
+    const plan = await generateWorkoutPlanWithOpenAI(profile, extendedProfile, remaining);
+    if (plan && plan.weeklyPlan && Object.keys(plan.weeklyPlan).length > 0) {
+      return plan;
+    } else {
+      console.warn('Plan généré invalide, utilisation du fallback');
+    }
+  } catch (error) {
+    console.warn('Échec initial via OpenAI (plan) :', error.message || error);
+    // Ne plus faire de seconde tentative ici car c'est géré dans generateWorkoutPlanWithOpenAI avec retry
+  }
+
+  console.log('Fallback sur le moteur de règles pour la génération du plan');
   return generateWorkoutPlanRules(profile, extendedProfile);
 }
 
@@ -1484,7 +1514,7 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
       selectedExercises = selectedExercises.slice(0, Math.max(selectedExercises.length, 3));
     }
     // Ajouter des exercices adaptés
-    selectedExercises.push({ name: 'Pont', sets: 3, reps: 10, rest: 60, muscles: ['Fessiers'], equipment: 'mat', difficulty: 1 });
+    selectedExercises.push({ name: 'Pont', sets: 3, reps: 10, duration: 10, rest: 5, muscles: ['Fessiers'], equipment: 'mat', difficulty: 1 });
   }
   
   if (hasKneeIssues) {
@@ -1501,7 +1531,7 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
       selectedExercises = selectedExercises.slice(0, Math.max(selectedExercises.length, 3));
     }
     // Ajouter des exercices adaptés
-    selectedExercises.push({ name: 'Extensions de jambes assis', sets: 3, reps: 12, rest: 45, muscles: ['Quadriceps'], equipment: 'chair', difficulty: 1 });
+    selectedExercises.push({ name: 'Extensions de jambes assis', sets: 3, reps: 12, duration: 10, rest: 5, muscles: ['Quadriceps'], equipment: 'chair', difficulty: 1 });
   }
   
   if (hasShoulderIssues) {
@@ -1525,7 +1555,7 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
       !ex.name.toLowerCase().includes('burpee')
     );
     selectedExercises.push(
-      { name: 'Marche active', sets: 1, duration: 600, rest: 0, muscles: ['Cardio léger'], equipment: 'none', difficulty: 1 }
+      { name: 'Marche active', sets: 1, duration: 10, rest: 5, muscles: ['Cardio léger'], equipment: 'none', difficulty: 1 }
     );
   }
 
@@ -1543,7 +1573,8 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     notes.push('Temps de repos allongé pour gérer votre niveau de fatigue élevé.');
     selectedExercises = selectedExercises.map(ex => ({
       ...ex,
-      rest: Math.min((ex.rest || 60) + 15, 120)
+      duration: 10,
+      rest: 5
     }));
   }
 
@@ -1569,23 +1600,25 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
       ...ex,
       sets: (ex.sets || 3) + 1,
       reps: ex.reps ? ex.reps + 2 : ex.reps,
-      rest: Math.max((ex.rest || 60) - 10, 30)
+      duration: 10,
+      rest: 5
     }));
   } else if (isWeightLoss || isEndurance) {
     // Ajouter plus d'exercices cardio
     selectedExercises.push(
-      { name: 'Mountain Climbers', sets: 3, duration: 30, rest: 30, muscles: ['Cardio'], equipment: 'mat', difficulty: 2 },
-      { name: 'Jumping Jacks', sets: 3, duration: 30, rest: 30, muscles: ['Cardio'], equipment: 'none', difficulty: 1 }
+      { name: 'Mountain Climbers', sets: 3, duration: 10, rest: 5, muscles: ['Cardio'], equipment: 'mat', difficulty: 2 },
+      { name: 'Jumping Jacks', sets: 3, duration: 10, rest: 5, muscles: ['Cardio'], equipment: 'none', difficulty: 1 }
     );
-    // Réduire le repos pour intensifier
+    // Forcer duration et rest pour tous les exercices
     selectedExercises = selectedExercises.map(ex => ({
       ...ex,
-      rest: Math.max((ex.rest || 60) - 15, 20)
+      duration: 10,
+      rest: 5
     }));
   } else if (isFlexibility) {
     selectedExercises.push(
-      { name: 'Étirements jambes', sets: 1, duration: 60, rest: 0, muscles: ['Flexibilité'], equipment: 'mat', difficulty: 1 },
-      { name: 'Étirements dos', sets: 1, duration: 60, rest: 0, muscles: ['Flexibilité'], equipment: 'mat', difficulty: 1 }
+      { name: 'Étirements jambes', sets: 1, duration: 10, rest: 5, muscles: ['Flexibilité'], equipment: 'mat', difficulty: 1 },
+      { name: 'Étirements dos', sets: 1, duration: 10, rest: 5, muscles: ['Flexibilité'], equipment: 'mat', difficulty: 1 }
     );
   }
 
@@ -1620,9 +1653,17 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     selectedExercises = selectedExercises.map(ex => ({
       ...ex,
       sets: ex.sets ? Math.max(ex.sets - 1, 1) : ex.sets,
-      rest: Math.min((ex.rest || 60) + 10, 120)
+      duration: 10,
+      rest: 5
     }));
   }
+  
+  // FORCER duration: 10 et rest: 5 pour TOUS les exercices
+  selectedExercises = selectedExercises.map(ex => ({
+    ...ex,
+    duration: 10,
+    rest: 5
+  }));
   
   // Vérification finale après ajustements
   if (!selectedExercises || selectedExercises.length === 0) {
@@ -1653,7 +1694,7 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
   // Adapter la durée selon les préférences
   const targetSessionDuration = preferredDuration * 60; // en secondes
   let currentDuration = selectedExercises.reduce((sum, ex) => {
-    const exDuration = (ex.sets || 1) * ((ex.reps ? ex.reps * 3 : ex.duration || 20) + (ex.rest || 60));
+    const exDuration = (ex.sets || 1) * ((ex.duration || 10) + (ex.rest || 5));
     return sum + exDuration;
   }, 0);
   
@@ -1873,7 +1914,7 @@ function calculateAge(birthdate, fallbackAge = null) {
   return fallbackAge;
 }
 
-// Construire le contexte utilisateur pour l'IA (FR-06) - OPTIMISÉ pour être plus rapide
+// Construire le contexte utilisateur pour l'IA (FR-06)
 function buildUserContext(profile = {}, extendedProfile = {}) {
   // Calculer l'IMC si disponible
   const computedBmi =
@@ -1882,36 +1923,61 @@ function buildUserContext(profile = {}, extendedProfile = {}) {
       ? Number((profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1))
       : null);
 
-  // Construire le contexte optimisé - UNIQUEMENT les informations essentielles saisies par l'utilisateur
-  // Ne pas inclure les champs null/vides pour réduire la taille du contexte
+  // Construire le contexte complet avec toutes les informations du profil
   const context = {
     basicProfile: {
+      name: profile.name || 'Utilisateur',
       age: calculateAge(profile.birthdate, profile.age),
+      weight: profile.weight || null,
+      height: profile.height || null,
       fitnessLevel: profile.fitness_level || 'beginner',
       primaryGoals: profile.goals || 'general',
       constraints: profile.constraints || ''
     },
+    physicalMetrics: {
+      bmi: computedBmi,
+      bodyComposition: extendedProfile.body_composition,
+      restingHeartRate: extendedProfile.resting_heart_rate,
+      bloodPressure: extendedProfile.blood_pressure,
+      waistCircumference: extendedProfile.waist_circumference,
+      hipCircumference: extendedProfile.hip_circumference,
+      armCircumference: extendedProfile.arm_circumference,
+      thighCircumference: extendedProfile.thigh_circumference
+    },
+    healthBackground: {
+      medicalHistory: extendedProfile.medical_history,
+      injuryHistory: extendedProfile.injury_history,
+      sleepQuality: extendedProfile.sleep_quality,
+      fatigueLevel: extendedProfile.fatigue_level,
+      dietType: extendedProfile.diet_type
+    },
     lifestyleHabits: {
-      weeklyAvailability: extendedProfile?.weekly_availability || '',
-      preferredSessionDuration: extendedProfile?.preferred_session_duration || 30,
-      trainingLocation: extendedProfile?.training_location || 'home',
-      availableEquipment: extendedProfile?.available_equipment || 'none'
+      weeklyAvailability: extendedProfile.weekly_availability,
+      preferredSessionDuration: extendedProfile.preferred_session_duration || 30,
+      trainingLocation: extendedProfile.training_location || 'home',
+      availableEquipment: extendedProfile.available_equipment || 'none',
+      dailySittingHours: extendedProfile.daily_sitting_hours
     },
     motivationAndPsychology: {
-      mainMotivation: extendedProfile?.main_motivation || 'health'
+      mainMotivation: extendedProfile.main_motivation || 'health',
+      coachingStylePreference: extendedProfile.coaching_style_preference,
+      demotivationFactors: extendedProfile.demotivation_factors,
+      engagementScore: extendedProfile.engagement_score,
+      socialPreference: extendedProfile.social_preference
+    },
+    sportsHistory: {
+      pastSports: extendedProfile.past_sports,
+      pastTrainingFrequency: extendedProfile.past_training_frequency,
+      timeSinceLastTraining: extendedProfile.time_since_last_training,
+      techniqueLevel: extendedProfile.technique_level
+    },
+    technicalPreferences: {
+      measurableGoals: extendedProfile.measurable_goals,
+      alertSensitivity: extendedProfile.alert_sensitivity,
+      cameraConsent: extendedProfile.camera_consent,
+      planningPreference: extendedProfile.planning_preference
     }
   };
-
-  // Ajouter uniquement les champs non vides pour optimiser
-  if (computedBmi) context.physicalMetrics = { bmi: computedBmi };
-  if (extendedProfile?.injury_history) {
-    if (!context.healthBackground) context.healthBackground = {};
-    context.healthBackground.injuryHistory = extendedProfile.injury_history;
-  }
-  if (extendedProfile?.past_sports) {
-    if (!context.sportsHistory) context.sportsHistory = {};
-    context.sportsHistory.pastSports = extendedProfile.past_sports;
-  }
 
   return sanitizeContextObject(context);
 }
@@ -1936,7 +2002,7 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
   
   // Valider et nettoyer chaque jour du plan
   const cleanedWeeklyPlan = {};
-  const defaultExercise = { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 };
+  const defaultExercise = { name: 'Squats', sets: 3, reps: 10, duration: 10, rest: 5, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 };
   
   for (const [day, exercises] of Object.entries(aiPlan.weeklyPlan)) {
     if (!Array.isArray(exercises)) {
@@ -1954,8 +2020,8 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
           name: String(ex.name || 'Exercice sans nom').trim(),
           sets: ex.sets && Number.isInteger(Number(ex.sets)) && Number(ex.sets) > 0 ? Number(ex.sets) : null,
           reps: ex.reps && Number.isInteger(Number(ex.reps)) && Number(ex.reps) > 0 ? Number(ex.reps) : null,
-          duration: ex.duration && Number.isInteger(Number(ex.duration)) && Number(ex.duration) > 0 ? Number(ex.duration) : null,
-          rest: ex.rest && Number.isInteger(Number(ex.rest)) && Number(ex.rest) >= 0 ? Number(ex.rest) : 60
+          duration: 10, // Forcer duration à 10 secondes
+          rest: 5 // Forcer rest à 5 secondes
         };
         
         // S'assurer qu'au moins sets, reps ou duration est défini
@@ -2172,7 +2238,7 @@ function generateWeeklySchedule(exercises, availability, preferredDuration, targ
   
   if (totalExercisesInPlan === 0) {
     console.error('ERREUR CRITIQUE: Le plan hebdomadaire est complètement vide après génération');
-    weeklyPlan.monday = [EXERCISE_DATABASE.beginner[0] || { name: 'Squats', sets: 3, reps: 10, rest: 60, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 }];
+    weeklyPlan.monday = [EXERCISE_DATABASE.beginner[0] || { name: 'Squats', sets: 3, reps: 10, duration: 10, rest: 5, muscles: ['Quadriceps'], equipment: 'none', difficulty: 1 }];
   }
   
   console.log(`Plan hebdomadaire généré: ${Object.keys(weeklyPlan).length} jours, ${totalExercisesInPlan} exercices au total`);
@@ -2238,20 +2304,9 @@ function optimizeWorkoutPlan(plan, sessionHistory, userFeedback, difficulty, rpe
     plan.weeklyPlan[day] = plan.weeklyPlan[day].map(exercise => {
       let newExercise = { ...exercise };
 
-      // Ajustements basés sur les paramètres d'optimisation
-      if (optimizationParams.intensityAdjustment > 0) {
-        // Augmenter l'intensité
-        if (exercise.reps) newExercise.reps = Math.round((exercise.reps || 0) * (1 + optimizationParams.intensityAdjustment));
-        if (exercise.sets) newExercise.sets = Math.round((exercise.sets || 0) * (1 + optimizationParams.intensityAdjustment * 0.5));
-        if (exercise.duration) newExercise.duration = Math.round((exercise.duration || 0) * (1 + optimizationParams.intensityAdjustment * 0.3));
-        newExercise.rest = Math.max(Math.round((newExercise.rest || 60) * (1 - optimizationParams.intensityAdjustment * 0.2)), 30);
-      } else if (optimizationParams.intensityAdjustment < 0) {
-        // Réduire l'intensité
-        if (exercise.reps) newExercise.reps = Math.max(Math.round((exercise.reps || 0) * (1 + optimizationParams.intensityAdjustment)), 5);
-        if (exercise.sets) newExercise.sets = Math.max(Math.round((exercise.sets || 0) * (1 + optimizationParams.intensityAdjustment * 0.5)), 1);
-        if (exercise.duration) newExercise.duration = Math.max(Math.round((exercise.duration || 0) * (1 + optimizationParams.intensityAdjustment * 0.3)), 10);
-        newExercise.rest = Math.round((newExercise.rest || 60) * (1 - optimizationParams.intensityAdjustment * 0.2));
-      }
+      // Forcer duration: 10 et rest: 5 pour tous les exercices
+      newExercise.duration = 10;
+      newExercise.rest = 5;
 
       return newExercise;
     });

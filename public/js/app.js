@@ -997,9 +997,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 await saveExtendedProfile({ silent: true });
             }
 
-            // Ne pas recharger le profil ou le dashboard ici pour éviter les redirections
-            // Le profil vient d'être sauvegardé, pas besoin de le recharger
-            // Ne pas charger le dashboard car cela pourrait déclencher une vérification du workflow
+            await loadProfile();
+            if (typeof loadExtendedProfile === 'function') {
+                await loadExtendedProfile();
+            }
+
+            // Recharger le dashboard pour mettre à jour les informations
+            await loadDashboard();
+
+            if (typeof advanceWorkflow === 'function') {
+                setTimeout(() => {
+                    advanceWorkflow();
+                }, 300);
+            }
 
             btn.textContent = 'Génération du plan...';
 
@@ -1010,74 +1020,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const generationTime = Date.now() - startTime;
             const slaMet = generationTime <= 5000;
 
-            // Charger le plan depuis le serveur (au cas où il n'est pas dans la réponse)
-            let plan = null;
-            if (data && data.plan) {
-                plan = data.plan;
-            } else {
-                // Si le plan n'est pas dans la réponse, le charger depuis le serveur
-                try {
-                    const planData = await api.getPlan();
-                    if (planData && planData.plan) {
-                        plan = planData.plan;
-                    }
-                } catch (error) {
-                    console.error('Erreur lors du chargement du plan:', error);
-                }
-            }
-
-            // Si on a un plan, afficher la page workout
-            if (plan) {
-                // Marquer l'utilisateur comme n'étant plus nouveau pour éviter les redirections du workflow
-                if (typeof window !== 'undefined' && window.isNewUser !== undefined) {
-                    // Accéder à la variable isNewUser depuis auth.js si elle est exposée
-                    try {
-                        // Essayer de mettre isNewUser à false via une fonction globale si elle existe
-                        if (typeof window.setIsNewUser === 'function') {
-                            window.setIsNewUser(false);
-                        }
-                    } catch (e) {
-                        console.log('Impossible de modifier isNewUser:', e);
-                    }
-                }
-                
-                // Utiliser un flag pour empêcher les redirections automatiques AVANT d'afficher la page
-                window.preventWorkflowRedirect = true;
-                
-                // Afficher la page workout
-                showPage('workout');
-                
-                if (typeof displayWorkoutPlan === 'function') {
-                    await displayWorkoutPlan(plan);
-                } else {
-                    // Attendre un peu et réessayer
-                    setTimeout(async () => {
-                        if (typeof displayWorkoutPlan === 'function') {
-                            await displayWorkoutPlan(plan);
-                        } else if (typeof loadWorkoutPlan === 'function') {
-                            const loadedPlan = await loadWorkoutPlan();
-                            if (loadedPlan && typeof displayWorkoutPlan === 'function') {
-                                await displayWorkoutPlan(loadedPlan);
-                            }
-                        }
-                    }, 200);
-                }
-                
-                // Réinitialiser le flag après un délai pour permettre les futures redirections
-                setTimeout(() => {
-                    window.preventWorkflowRedirect = false;
-                }, 2000);
-                
-                // Ne pas appeler advanceWorkflow() ici car on veut rester sur la page workout
-                // L'utilisateur vient de générer son plan et veut le voir
-            } else {
-                // Si aucun plan n'a pu être chargé, afficher un message d'erreur
-                alert(`Erreur: Impossible de générer le plan d'entraînement. Veuillez réessayer.`);
-                console.error('Aucun plan généré:', data);
-            }
-
             btn.textContent = originalText;
             btn.disabled = false;
+
+            if (data && data.plan) {
+                showPage('workout');
+                if (typeof displayWorkoutPlan === 'function') {
+                    await displayWorkoutPlan(data.plan);
+                } else {
+                    setTimeout(async () => {
+                        const plan = await loadWorkoutPlan();
+                        if (plan && typeof displayWorkoutPlan === 'function') {
+                            await displayWorkoutPlan(plan);
+                        }
+                    }, 100);
+                }
+            } else {
+                alert(`Profil enregistré et plan généré en ${generationTime}ms ! ${slaMet ? '✅' : '⚠️'}`);
+                // Recharger le dashboard pour afficher les nouvelles informations
+                await loadDashboard();
+            }
         } catch (error) {
             console.error('Erreur sauvegarde profil complet:', error);
             alert('Erreur: ' + (error?.message || 'Impossible de sauvegarder le profil'));

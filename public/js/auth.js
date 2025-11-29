@@ -271,7 +271,19 @@ async function showApp() {
 }
 
 // Afficher un message d'aide pour le workflow (workflow nouveau utilisateur)
-function showWorkflowMessage(message) {
+function showWorkflowMessage(message, showOnlyOnce = true) {
+    // Vérifier si le message a déjà été affiché (une seule fois au premier chargement)
+    if (showOnlyOnce) {
+        const messageShownKey = 'workflow-message-shown';
+        const messageShown = localStorage.getItem(messageShownKey);
+        if (messageShown === 'true') {
+            // Le message a déjà été affiché, ne pas l'afficher à nouveau
+            return;
+        }
+        // Marquer comme affiché
+        localStorage.setItem(messageShownKey, 'true');
+    }
+    
     // Supprimer le message précédent s'il existe
     const existingMessage = document.getElementById('workflow-message');
     if (existingMessage) {
@@ -295,32 +307,16 @@ function showWorkflowMessage(message) {
         appContainer.insertBefore(messageDiv, appContainer.firstChild);
     }
     
-    // Faire disparaître automatiquement après 5 secondes
+    // Fermer automatiquement après 5 secondes
     setTimeout(() => {
-        const messageToRemove = document.getElementById('workflow-message');
-        if (messageToRemove) {
-            messageToRemove.style.animation = 'slideUp 0.3s ease';
-            setTimeout(() => {
-                messageToRemove.remove();
-            }, 300);
+        if (messageDiv && messageDiv.parentElement) {
+            messageDiv.remove();
         }
     }, 5000);
 }
 
 // Fonction globale pour passer à l'étape suivante du workflow
 window.advanceWorkflow = async function() {
-    // Ne pas rediriger si on est sur la page workout (plan vient d'être généré)
-    const currentPage = document.querySelector('.page.active');
-    if (currentPage && currentPage.id === 'workout-page') {
-        // Si on est sur la page workout, ne pas rediriger
-        return;
-    }
-    
-    // Vérifier le flag global pour empêcher les redirections
-    if (window.preventWorkflowRedirect === true) {
-        return;
-    }
-    
     if (!isNewUser) {
         showPage('dashboard');
         if (typeof loadDashboard === 'function') {
@@ -348,11 +344,6 @@ window.advanceWorkflow = async function() {
             initConsent();
         }
     } else if (nextStep === 'profile') {
-        // Ne pas rediriger vers le profil si on est déjà sur workout
-        const currentPage = document.querySelector('.page.active');
-        if (currentPage && currentPage.id === 'workout-page') {
-            return;
-        }
         showPage('profile');
         if (typeof loadProfile === 'function') {
             loadProfile();
@@ -391,14 +382,6 @@ function showPage(pageId) {
         pageElement.classList.add('active');
     }
     
-    // Fermer le menu mobile lors du changement de page
-    const navLinks = document.querySelector('.nav-links');
-    const navToggle = document.querySelector('.nav-toggle');
-    if (navLinks?.classList.contains('open')) {
-        navLinks.classList.remove('open');
-        navToggle?.classList.remove('open');
-    }
-    
     // Mettre à jour la navigation active
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -412,12 +395,10 @@ function showPage(pageId) {
     }
     
     // Charger automatiquement le plan quand on affiche la page workout
-    // MAIS seulement si on n'est pas en train de générer un plan (pour éviter les conflits)
-    if (pageId === 'workout' && !window.preventWorkflowRedirect) {
+    if (pageId === 'workout') {
         // Attendre un peu pour que la page soit visible
         setTimeout(async () => {
-            // Vérifier à nouveau le flag au cas où il aurait changé
-            if (!window.preventWorkflowRedirect && typeof loadWorkoutPlan === 'function' && typeof displayWorkoutPlan === 'function') {
+            if (typeof loadWorkoutPlan === 'function' && typeof displayWorkoutPlan === 'function') {
                 const plan = await loadWorkoutPlan();
                 await displayWorkoutPlan(plan);
             }
@@ -575,22 +556,44 @@ document.addEventListener('DOMContentLoaded', () => {
         navToggle.classList.toggle('open');
     });
     
-    // Fermer le menu automatiquement au début du scroll
+    // Fermer le menu dès qu'on commence à scroller
     let scrollTimeout = null;
     let lastScrollTop = 0;
     window.addEventListener('scroll', () => {
-        // Fermer immédiatement le menu si ouvert
-        if (navLinks?.classList.contains('open')) {
+        // Détecter le début du scroll (même petite quantité)
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollDelta = Math.abs(scrollTop - lastScrollTop);
+        
+        // Si on a scrollé d'au moins 1px, fermer le menu
+        if (scrollDelta > 0 && navLinks?.classList.contains('open')) {
             closeMenu();
         }
+        
+        lastScrollTop = scrollTop;
         
         // Debounce pour éviter trop d'appels
         if (scrollTimeout) {
             clearTimeout(scrollTimeout);
         }
         scrollTimeout = setTimeout(() => {
-            lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            // Nettoyer après le scroll
         }, 100);
+    }, { passive: true });
+    
+    // Fermer aussi au touchmove (pour mobile)
+    let touchStartY = 0;
+    document.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    
+    document.addEventListener('touchmove', (e) => {
+        const touchY = e.touches[0].clientY;
+        const touchDelta = Math.abs(touchY - touchStartY);
+        
+        // Si on a commencé à scroller (touchmove), fermer le menu
+        if (touchDelta > 5 && navLinks?.classList.contains('open')) {
+            closeMenu();
+        }
     }, { passive: true });
 
     // Login

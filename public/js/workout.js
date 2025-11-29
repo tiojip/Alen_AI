@@ -603,11 +603,9 @@ function mapCatalogExerciseForWorkout(exercise) {
     const parsedReps = Number.isFinite(Number(exercise.reps)) ? Number(exercise.reps) : parseInt(exercise.reps, 10);
     const reps = Number.isFinite(parsedReps) && parsedReps > 0 ? parsedReps : null;
 
-    const parsedDuration = Number.isFinite(Number(exercise.duration)) ? Number(exercise.duration) : parseInt(exercise.duration, 10);
-    const duration = Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : (reps ? null : 30);
-
-    const parsedRest = Number.isFinite(Number(exercise.rest)) ? Number(exercise.rest) : parseInt(exercise.rest, 10);
-    const rest = Number.isFinite(parsedRest) && parsedRest >= 0 ? parsedRest : 60;
+    // Forcer duration: 10 et rest: 5 pour tous les exercices
+    const duration = 10;
+    const rest = 5;
 
     return {
         name: exercise.name,
@@ -805,7 +803,7 @@ function updateProgressIndicators(exercise) {
     const totalExercises = currentWorkout.exercises.length;
     const totalSets = exercise.sets || 1;
     const totalReps = exercise.reps || 0;
-    const exerciseDuration = exercise.duration || 0;
+    const exerciseDuration = exercise.duration || 10;
 
     // Indicateur exercice
     const exerciseCounter = document.getElementById('exercise-counter');
@@ -839,7 +837,7 @@ function startExerciseProgress(exercise) {
 
     resetExerciseTimers(false);
     const totalReps = exercise.reps || 0;
-    currentExerciseDurationMs = (exercise.duration || 0) * 1000; // Convertir en ms
+    currentExerciseDurationMs = (exercise.duration || 10) * 1000; // Convertir en ms (10 secondes par défaut)
     exerciseElapsedBeforePause = 0;
 
     if (currentExerciseDurationMs > 0) {
@@ -894,7 +892,7 @@ function completeExerciseSet() {
         playSound('exercise-complete');
         
         // Démarrer le repos avant le prochain exercice
-        const restTime = exercise.rest || 30; // 30 secondes par défaut
+        const restTime = exercise.rest || 5; // 5 secondes par défaut
         startRestCountdown(restTime, () => {
             // Après le repos, passer à l'exercice suivant
             currentExerciseIndex++;
@@ -905,7 +903,7 @@ function completeExerciseSet() {
     } else {
         // Sinon, démarrer le repos entre les séries
         currentSet++;
-        const restTime = exercise.rest || 30;
+        const restTime = exercise.rest || 5;
         startRestCountdown(restTime, () => {
             // Après le repos, continuer avec la série suivante
             currentRep = 0;
