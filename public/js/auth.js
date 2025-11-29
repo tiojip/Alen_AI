@@ -294,6 +294,17 @@ function showWorkflowMessage(message) {
     if (appContainer) {
         appContainer.insertBefore(messageDiv, appContainer.firstChild);
     }
+    
+    // Faire disparaître automatiquement après 5 secondes
+    setTimeout(() => {
+        const messageToRemove = document.getElementById('workflow-message');
+        if (messageToRemove) {
+            messageToRemove.style.animation = 'slideUp 0.3s ease';
+            setTimeout(() => {
+                messageToRemove.remove();
+            }, 300);
+        }
+    }, 5000);
 }
 
 // Fonction globale pour passer à l'étape suivante du workflow
@@ -361,6 +372,14 @@ function showPage(pageId) {
     const pageElement = document.getElementById(`${pageId}-page`);
     if (pageElement) {
         pageElement.classList.add('active');
+    }
+    
+    // Fermer le menu mobile lors du changement de page
+    const navLinks = document.querySelector('.nav-links');
+    const navToggle = document.querySelector('.nav-toggle');
+    if (navLinks?.classList.contains('open')) {
+        navLinks.classList.remove('open');
+        navToggle?.classList.remove('open');
     }
     
     // Mettre à jour la navigation active
@@ -522,10 +541,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const navToggle = document.querySelector('.nav-toggle');
     const navLinks = document.querySelector('.nav-links');
+    
+    // Fonction pour fermer le menu
+    const closeMenu = () => {
+        if (navLinks?.classList.contains('open')) {
+            navLinks.classList.remove('open');
+            navToggle?.classList.remove('open');
+        }
+    };
+    
+    // Toggle du menu au clic
     navToggle?.addEventListener('click', () => {
         navLinks?.classList.toggle('open');
         navToggle.classList.toggle('open');
     });
+    
+    // Fermer le menu automatiquement au début du scroll
+    let scrollTimeout = null;
+    let lastScrollTop = 0;
+    window.addEventListener('scroll', () => {
+        // Fermer immédiatement le menu si ouvert
+        if (navLinks?.classList.contains('open')) {
+            closeMenu();
+        }
+        
+        // Debounce pour éviter trop d'appels
+        if (scrollTimeout) {
+            clearTimeout(scrollTimeout);
+        }
+        scrollTimeout = setTimeout(() => {
+            lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        }, 100);
+    }, { passive: true });
 
     // Login
     document.getElementById('login-form').addEventListener('submit', async (e) => {
