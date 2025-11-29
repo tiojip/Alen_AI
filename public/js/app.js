@@ -997,13 +997,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 await saveExtendedProfile({ silent: true });
             }
 
-            await loadProfile();
-            if (typeof loadExtendedProfile === 'function') {
-                await loadExtendedProfile();
-            }
-
-            // Recharger le dashboard pour mettre à jour les informations
-            await loadDashboard();
+            // Ne pas recharger le profil ou le dashboard ici pour éviter les redirections
+            // Le profil vient d'être sauvegardé, pas besoin de le recharger
+            // Ne pas charger le dashboard car cela pourrait déclencher une vérification du workflow
 
             btn.textContent = 'Génération du plan...';
 
@@ -1032,7 +1028,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Si on a un plan, afficher la page workout
             if (plan) {
+                // Marquer l'utilisateur comme n'étant plus nouveau pour éviter les redirections du workflow
+                if (typeof window !== 'undefined' && window.isNewUser !== undefined) {
+                    // Accéder à la variable isNewUser depuis auth.js si elle est exposée
+                    try {
+                        // Essayer de mettre isNewUser à false via une fonction globale si elle existe
+                        if (typeof window.setIsNewUser === 'function') {
+                            window.setIsNewUser(false);
+                        }
+                    } catch (e) {
+                        console.log('Impossible de modifier isNewUser:', e);
+                    }
+                }
+                
+                // Utiliser un flag pour empêcher les redirections automatiques AVANT d'afficher la page
+                window.preventWorkflowRedirect = true;
+                
+                // Afficher la page workout
                 showPage('workout');
+                
                 if (typeof displayWorkoutPlan === 'function') {
                     await displayWorkoutPlan(plan);
                 } else {
@@ -1048,6 +1062,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }, 200);
                 }
+                
+                // Réinitialiser le flag après un délai pour permettre les futures redirections
+                setTimeout(() => {
+                    window.preventWorkflowRedirect = false;
+                }, 2000);
                 
                 // Ne pas appeler advanceWorkflow() ici car on veut rester sur la page workout
                 // L'utilisateur vient de générer son plan et veut le voir

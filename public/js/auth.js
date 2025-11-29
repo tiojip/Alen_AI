@@ -309,6 +309,18 @@ function showWorkflowMessage(message) {
 
 // Fonction globale pour passer à l'étape suivante du workflow
 window.advanceWorkflow = async function() {
+    // Ne pas rediriger si on est sur la page workout (plan vient d'être généré)
+    const currentPage = document.querySelector('.page.active');
+    if (currentPage && currentPage.id === 'workout-page') {
+        // Si on est sur la page workout, ne pas rediriger
+        return;
+    }
+    
+    // Vérifier le flag global pour empêcher les redirections
+    if (window.preventWorkflowRedirect === true) {
+        return;
+    }
+    
     if (!isNewUser) {
         showPage('dashboard');
         if (typeof loadDashboard === 'function') {
@@ -336,6 +348,11 @@ window.advanceWorkflow = async function() {
             initConsent();
         }
     } else if (nextStep === 'profile') {
+        // Ne pas rediriger vers le profil si on est déjà sur workout
+        const currentPage = document.querySelector('.page.active');
+        if (currentPage && currentPage.id === 'workout-page') {
+            return;
+        }
         showPage('profile');
         if (typeof loadProfile === 'function') {
             loadProfile();
@@ -395,10 +412,12 @@ function showPage(pageId) {
     }
     
     // Charger automatiquement le plan quand on affiche la page workout
-    if (pageId === 'workout') {
+    // MAIS seulement si on n'est pas en train de générer un plan (pour éviter les conflits)
+    if (pageId === 'workout' && !window.preventWorkflowRedirect) {
         // Attendre un peu pour que la page soit visible
         setTimeout(async () => {
-            if (typeof loadWorkoutPlan === 'function' && typeof displayWorkoutPlan === 'function') {
+            // Vérifier à nouveau le flag au cas où il aurait changé
+            if (!window.preventWorkflowRedirect && typeof loadWorkoutPlan === 'function' && typeof displayWorkoutPlan === 'function') {
                 const plan = await loadWorkoutPlan();
                 await displayWorkoutPlan(plan);
             }
