@@ -737,27 +737,24 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
   const startTime = Date.now();
   
   try {
-    // Utiliser le profil du body si fourni (plus rapide), sinon récupérer depuis la DB
-    let profile = req.body.profile || {};
-    let extendedProfile = null;
-    
-    // Si le profil n'est pas fourni dans le body, le récupérer depuis la DB
-    if (!profile || Object.keys(profile).length === 0) {
-      profile = await new Promise((resolve, reject) => {
-        db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
-          [req.user.id], (err, userProfile) => {
-          if (err) {
-            console.error('Erreur récupération profil:', err);
-            reject(err);
-          } else {
-            resolve(userProfile || {});
-          }
-        });
+    // Récupérer le profil complet depuis la base de données pour garantir la personnalisation
+    const userProfile = await new Promise((resolve, reject) => {
+      db.get('SELECT id, email, name, age, birthdate, weight, height, fitness_level, goals, constraints FROM users WHERE id = ?', 
+        [req.user.id], (err, profile) => {
+        if (err) {
+          console.error('Erreur récupération profil:', err);
+          reject(err);
+        } else {
+          resolve(profile);
+        }
       });
-    }
+    });
     
-    // Récupérer le profil étendu en parallèle si nécessaire
-    extendedProfile = await new Promise((resolve) => {
+    // Utiliser le profil de la base de données, avec fallback sur celui du body si nécessaire
+    const profile = userProfile || req.body.profile || {};
+    
+    // Récupérer le profil étendu pour une meilleure personnalisation (FR-06)
+    const extendedProfile = await new Promise((resolve, reject) => {
       db.get('SELECT * FROM user_profile_extended WHERE user_id = ?', [req.user.id], (err, extProfile) => {
         if (err) {
           console.error('Erreur récupération profil étendu:', err);
@@ -768,22 +765,43 @@ app.post('/api/workout/generate', authenticateToken, async (req, res) => {
       });
     });
     
-    // Log pour vérifier que les données sont bien récupérées
-    console.log('Génération plan - Profil de base:', {
+    // Log détaillé pour vérifier que TOUTES les données sont bien récupérées
+    console.log('=== GÉNÉRATION PLAN - PROFIL COMPLET ===');
+    console.log('Profil de base (users):', {
+      id: profile.id,
       name: profile.name,
       age: calculateAge(profile.birthdate, profile.age),
+      weight: profile.weight,
+      height: profile.height,
       fitness_level: profile.fitness_level,
       goals: profile.goals,
       constraints: profile.constraints
     });
     if (extendedProfile) {
-      console.log('Génération plan - Profil étendu disponible:', {
+      console.log('Profil étendu (user_profile_extended):', {
         available_equipment: extendedProfile.available_equipment,
         preferred_session_duration: extendedProfile.preferred_session_duration,
         main_motivation: extendedProfile.main_motivation,
-        weekly_availability: extendedProfile.weekly_availability
+        weekly_availability: extendedProfile.weekly_availability,
+        training_location: extendedProfile.training_location,
+        past_sports: extendedProfile.past_sports,
+        past_training_frequency: extendedProfile.past_training_frequency,
+        time_since_last_training: extendedProfile.time_since_last_training,
+        technique_level: extendedProfile.technique_level,
+        measurable_goals: extendedProfile.measurable_goals,
+        diet_type: extendedProfile.diet_type,
+        sleep_quality: extendedProfile.sleep_quality,
+        fatigue_level: extendedProfile.fatigue_level,
+        resting_heart_rate: extendedProfile.resting_heart_rate,
+        injury_history: extendedProfile.injury_history,
+        medical_history: extendedProfile.medical_history,
+        coaching_style_preference: extendedProfile.coaching_style_preference,
+        daily_sitting_hours: extendedProfile.daily_sitting_hours
       });
+    } else {
+      console.warn('ATTENTION: Aucun profil étendu trouvé pour cet utilisateur');
     }
+    console.log('==========================================');
     
     // Génération améliorée avec IA (FR-06) - SLA ≤5s
     const plan = await generateWorkoutPlanAI(profile, extendedProfile, startTime);
@@ -1171,8 +1189,34 @@ const EXERCISE_DATABASE = {
 
 // Fonction de génération de plan améliorée avec IA (FR-06) - SLA ≤5s
 async function generateWorkoutPlanAI(profile, extendedProfile, startTime) {
-  // Utiliser directement le moteur de règles pour une génération rapide
-  // Le moteur de règles est optimisé et utilise uniquement les champs remplis
+  const MAX_GENERATION_TIME = 5000; // objectif SLA
+
+  if (!HAS_OPENAI_KEY) {
+    console.warn('Aucune clé API OpenAI détectée, utilisation du moteur de règles');
+    return generateWorkoutPlanRules(profile, extendedProfile);
+  }
+
+  const elapsed = Date.now() - startTime;
+  const remaining = MAX_GENERATION_TIME - elapsed;
+
+  if (remaining <= 600) {
+    console.warn('Temps insuffisant pour appeler l’IA, utilisation du moteur de règles');
+    return generateWorkoutPlanRules(profile, extendedProfile);
+  }
+
+  try {
+    const plan = await generateWorkoutPlanWithOpenAI(profile, extendedProfile, remaining);
+    if (plan && plan.weeklyPlan && Object.keys(plan.weeklyPlan).length > 0) {
+      return plan;
+    } else {
+      console.warn('Plan généré invalide, utilisation du fallback');
+    }
+  } catch (error) {
+    console.warn('Échec initial via OpenAI (plan) :', error.message || error);
+    // Ne plus faire de seconde tentative ici car c'est géré dans generateWorkoutPlanWithOpenAI avec retry
+  }
+
+  console.log('Fallback sur le moteur de règles pour la génération du plan');
   return generateWorkoutPlanRules(profile, extendedProfile);
 }
 
@@ -1264,7 +1308,7 @@ async function generateWorkoutPlanWithOpenAI(profile, extendedProfile, timeBudge
       messages: [
         {
           role: 'system',
-          content: `Tu es Alen, coach sportif IA. Tu dois générer un plan d'entraînement personnalisé STRICTEMENT conforme au schéma JSON fourni.
+          content: `Tu es Alen, coach sportif IA. Tu dois générer un plan d'entraînement personnalisé STRICTEMENT conforme au schéma JSON fourni. 
 
 INSTRUCTIONS IMPORTANTES:
 1. Utilise TOUTES les informations du profil utilisateur fourni pour personnaliser le plan:
@@ -1293,11 +1337,29 @@ INSTRUCTIONS IMPORTANTES:
         },
         {
           role: 'user',
-          content: `Conçois un plan d'entraînement personnalisé en utilisant TOUTES les informations du profil utilisateur suivant. Adapte chaque aspect du plan (exercices, volume, intensité, fréquence) selon ces données complètes:
+          content: `Conçois un plan d'entraînement personnalisé en utilisant TOUTES les informations du profil utilisateur suivant. 
 
+IMPORTANT: Utilise EXACTEMENT les valeurs fournies ci-dessous. Ne remplace PAS ces valeurs par des valeurs par défaut ou génériques.
+
+Profil utilisateur complet:
 ${JSON.stringify(userContext, null, 2)}
 
-Génère un plan hebdomadaire adapté avec des exercices spécifiques selon le niveau, les objectifs, les contraintes, l'équipement disponible, la durée préférée et toutes les autres informations du profil.`
+Instructions spécifiques:
+1. Niveau de forme: ${userContext.basicProfile?.fitnessLevel || 'beginner'} - Utilise EXACTEMENT ce niveau
+2. Objectifs principaux: ${userContext.basicProfile?.primaryGoals || 'general'} - Adapte les exercices à ces objectifs
+3. Contraintes: ${userContext.basicProfile?.constraints || 'Aucune'} - Évite les exercices qui aggravent ces contraintes
+4. Équipement disponible: ${userContext.lifestyleHabits?.availableEquipment || 'none'} - Utilise UNIQUEMENT cet équipement
+5. Durée de séance préférée: ${userContext.lifestyleHabits?.preferredSessionDuration || 30} minutes - Adapte la durée totale
+6. Disponibilité hebdomadaire: ${userContext.lifestyleHabits?.weeklyAvailability || 'Non spécifiée'} - Utilise UNIQUEMENT ces jours
+7. Lieu d'entraînement: ${userContext.lifestyleHabits?.trainingLocation || 'home'} - Adapte les exercices à ce lieu
+8. Historique sportif: ${userContext.sportsHistory?.pastSports || 'Aucun'} - Prends en compte l'expérience
+9. Temps depuis dernier entraînement: ${userContext.sportsHistory?.timeSinceLastTraining || 'Non spécifié'} - Ajuste l'intensité
+10. Niveau technique: ${userContext.sportsHistory?.techniqueLevel || 'Non spécifié'} - Sélectionne des exercices adaptés
+11. Antécédents médicaux/blessures: ${userContext.healthBackground?.injuryHistory || 'Aucun'} - Évite les exercices problématiques
+12. IMC: ${userContext.physicalMetrics?.bmi || 'Non calculé'} - Adapte l'intensité si nécessaire
+13. Motivation: ${userContext.motivationAndPsychology?.mainMotivation || 'health'} - Adapte le style d'entraînement
+
+Génère un plan hebdomadaire qui respecte STRICTEMENT toutes ces informations. Chaque exercice doit être choisi en fonction de ces critères.`
         }
       ],
       max_tokens: 700,
@@ -1371,9 +1433,21 @@ Génère un plan hebdomadaire adapté avec des exercices spécifiques selon le n
 
 // Moteur de règles optimisé (FR-06) - toujours <5s
 function generateWorkoutPlanRules(profile, extendedProfile) {
-  const level = profile.fitness_level || 'beginner';
-  const goals = profile.goals || 'general';
-  const constraints = profile.constraints || '';
+  // Utiliser les valeurs EXACTES du profil, avec logging pour vérification
+  const level = profile?.fitness_level || 'beginner';
+  const goals = profile?.goals || 'general';
+  const constraints = profile?.constraints || '';
+  
+  console.log('=== MOTEUR DE RÈGLES - PROFIL UTILISÉ ===');
+  console.log('Niveau:', level, '(profil:', profile?.fitness_level, ')');
+  console.log('Objectifs:', goals, '(profil:', profile?.goals, ')');
+  console.log('Contraintes:', constraints, '(profil:', profile?.constraints, ')');
+  if (extendedProfile) {
+    console.log('Équipement:', extendedProfile.available_equipment);
+    console.log('Disponibilité:', extendedProfile.weekly_availability);
+    console.log('Durée préférée:', extendedProfile.preferred_session_duration);
+  }
+  console.log('==========================================');
   
   // Analyser le profil étendu (FR-04)
   const availableEquipment = extendedProfile?.available_equipment?.toLowerCase() || '';
@@ -1454,9 +1528,9 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
     // Si le filtrage a supprimé tous les exercices, garder ceux sans matériel
     if (filtered.length > 0) {
       selectedExercises = filtered;
-    } else {
+  } else {
       console.warn('Filtrage par équipement a supprimé tous les exercices, utilisation des exercices sans matériel');
-      selectedExercises = selectedExercises.filter(ex => ex.equipment === 'none' || ex.equipment === 'mat');
+    selectedExercises = selectedExercises.filter(ex => ex.equipment === 'none' || ex.equipment === 'mat');
       // Si toujours vide, utiliser tous les exercices
       if (selectedExercises.length === 0) {
         selectedExercises = [...EXERCISE_DATABASE.beginner];
@@ -1686,7 +1760,7 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
       !selectedExercises.some(se => se.name === ex.name)
     );
     if (additionalExercises.length > 0) {
-      selectedExercises.push(...additionalExercises.slice(0, 2));
+    selectedExercises.push(...additionalExercises.slice(0, 2));
     }
   }
   
@@ -1742,7 +1816,7 @@ function generateWorkoutPlanRules(profile, extendedProfile) {
   }
   
   console.log(`Génération plan: ${selectedExercises.length} exercices sélectionnés pour niveau ${level}`);
-  
+
   const weeklyPlan = generateWeeklySchedule(selectedExercises, weeklyAvailability, preferredDuration, targetSessions);
   
   // VÉRIFICATION FINALE : S'assurer que le plan hebdomadaire contient des exercices
@@ -2045,7 +2119,8 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
   
   aiPlan.weeklyPlan = cleanedWeeklyPlan;
   
-  // Enrichir avec les métadonnées
+  // Enrichir avec les métadonnées EXACTES du profil utilisateur
+  // Utiliser les valeurs réelles du profil, avec fallback uniquement si vraiment absent
   aiPlan.level = profile?.fitness_level || 'beginner';
   aiPlan.goals = profile?.goals || 'general';
   aiPlan.constraints = profile?.constraints || '';
@@ -2053,6 +2128,18 @@ function validateAndEnrichPlan(aiPlan, profile, extendedProfile) {
   aiPlan.seed = generatePlanSeed(profile || {}, extendedProfile || {});
   aiPlan.createdAt = new Date().toISOString();
   aiPlan.duration = aiPlan.duration || '4 weeks';
+  
+  // Log pour vérifier que les métadonnées correspondent au profil
+  console.log('=== MÉTADONNÉES DU PLAN GÉNÉRÉ ===');
+  console.log('Niveau plan:', aiPlan.level, '| Niveau profil:', profile?.fitness_level, '| Correspond:', aiPlan.level === profile?.fitness_level);
+  console.log('Objectifs plan:', aiPlan.goals, '| Objectifs profil:', profile?.goals, '| Correspond:', aiPlan.goals === profile?.goals);
+  console.log('Contraintes plan:', aiPlan.constraints, '| Contraintes profil:', profile?.constraints, '| Correspond:', aiPlan.constraints === profile?.constraints);
+  if (extendedProfile) {
+    console.log('Disponibilité plan:', aiPlan.metadata?.weeklyAvailability, '| Disponibilité profil:', extendedProfile.weekly_availability);
+    console.log('Équipement plan:', aiPlan.metadata?.equipment, '| Équipement profil:', extendedProfile.available_equipment);
+    console.log('Durée plan:', aiPlan.metadata?.preferredDuration, '| Durée profil:', extendedProfile.preferred_session_duration);
+  }
+  console.log('===================================');
   
   const computedBmi =
     extendedProfile?.bmi ||

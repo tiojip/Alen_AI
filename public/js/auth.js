@@ -557,44 +557,144 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Fermer le menu dès qu'on commence à scroller
+    // OPTIMISATION: Ne s'exécuter que si l'application est visible (pas sur la page de login)
     let scrollTimeout = null;
     let lastScrollTop = 0;
-    window.addEventListener('scroll', () => {
-        // Détecter le début du scroll (même petite quantité)
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const scrollDelta = Math.abs(scrollTop - lastScrollTop);
-        
-        // Si on a scrollé d'au moins 1px, fermer le menu
-        if (scrollDelta > 0 && navLinks?.classList.contains('open')) {
-            closeMenu();
-        }
-        
-        lastScrollTop = scrollTop;
-        
-        // Debounce pour éviter trop d'appels
-        if (scrollTimeout) {
-            clearTimeout(scrollTimeout);
-        }
-        scrollTimeout = setTimeout(() => {
-            // Nettoyer après le scroll
-        }, 100);
-    }, { passive: true });
-    
-    // Fermer aussi au touchmove (pour mobile)
     let touchStartY = 0;
-    document.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-    }, { passive: true });
+    let scrollHandler = null;
+    let touchStartHandler = null;
+    let touchMoveHandler = null;
     
-    document.addEventListener('touchmove', (e) => {
-        const touchY = e.touches[0].clientY;
-        const touchDelta = Math.abs(touchY - touchStartY);
+    // Fonction pour activer/désactiver les listeners selon la page active
+    function setupScrollListeners() {
+        const loginPage = document.getElementById('login-page');
+        const appContainer = document.getElementById('app-container');
+        const isLoginPage = loginPage && !loginPage.classList.contains('hidden') && loginPage.style.display !== 'none';
+        const isAppVisible = appContainer && !appContainer.classList.contains('hidden') && appContainer.style.display !== 'none';
         
-        // Si on a commencé à scroller (touchmove), fermer le menu
-        if (touchDelta > 5 && navLinks?.classList.contains('open')) {
-            closeMenu();
+        // Ne s'exécuter que si l'application est visible (pas la page de login)
+        if (!isAppVisible || isLoginPage) {
+            // Désactiver les listeners si on est sur la page de login
+            if (scrollHandler) {
+                window.removeEventListener('scroll', scrollHandler, { passive: true });
+                scrollHandler = null;
+            }
+            if (touchStartHandler) {
+                document.removeEventListener('touchstart', touchStartHandler, { passive: true });
+                touchStartHandler = null;
+            }
+            if (touchMoveHandler) {
+                document.removeEventListener('touchmove', touchMoveHandler, { passive: true });
+                touchMoveHandler = null;
+            }
+            return;
         }
-    }, { passive: true });
+        
+        // Activer les listeners seulement si l'application est visible
+        if (!scrollHandler) {
+            scrollHandler = () => {
+                // Vérifier à nouveau si on est toujours sur l'app (éviter les appels inutiles)
+                const currentLoginPage = document.getElementById('login-page');
+                const currentAppContainer = document.getElementById('app-container');
+                const stillOnLogin = currentLoginPage && !currentLoginPage.classList.contains('hidden') && currentLoginPage.style.display !== 'none';
+                const stillOnApp = currentAppContainer && !currentAppContainer.classList.contains('hidden') && currentAppContainer.style.display !== 'none';
+                
+                if (stillOnLogin || !stillOnApp) {
+                    return; // Ne rien faire si on est sur la page de login
+                }
+                
+                // Détecter le début du scroll (même petite quantité)
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const scrollDelta = Math.abs(scrollTop - lastScrollTop);
+                
+                // Si on a scrollé d'au moins 1px, fermer le menu
+                if (scrollDelta > 0 && navLinks?.classList.contains('open')) {
+                    closeMenu();
+                }
+                
+                lastScrollTop = scrollTop;
+                
+                // Debounce pour éviter trop d'appels
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                }
+                scrollTimeout = setTimeout(() => {
+                    // Nettoyer après le scroll
+                }, 100);
+            };
+            window.addEventListener('scroll', scrollHandler, { passive: true });
+        }
+        
+        if (!touchStartHandler) {
+            touchStartHandler = (e) => {
+                // Vérifier si on est sur la page de login
+                const currentLoginPage = document.getElementById('login-page');
+                const currentAppContainer = document.getElementById('app-container');
+                const stillOnLogin = currentLoginPage && !currentLoginPage.classList.contains('hidden') && currentLoginPage.style.display !== 'none';
+                const stillOnApp = currentAppContainer && !currentAppContainer.classList.contains('hidden') && currentAppContainer.style.display !== 'none';
+                
+                if (stillOnLogin || !stillOnApp) {
+                    return; // Ne rien faire si on est sur la page de login
+                }
+                
+                // Vérifier si on est en train de taper dans un champ (ne pas fermer le menu)
+                const target = e.target;
+                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+                    return; // Ne pas fermer le menu si on tape dans un champ
+                }
+                
+                touchStartY = e.touches[0].clientY;
+            };
+            document.addEventListener('touchstart', touchStartHandler, { passive: true });
+        }
+        
+        if (!touchMoveHandler) {
+            touchMoveHandler = (e) => {
+                // Vérifier si on est sur la page de login
+                const currentLoginPage = document.getElementById('login-page');
+                const currentAppContainer = document.getElementById('app-container');
+                const stillOnLogin = currentLoginPage && !currentLoginPage.classList.contains('hidden') && currentLoginPage.style.display !== 'none';
+                const stillOnApp = currentAppContainer && !currentAppContainer.classList.contains('hidden') && currentAppContainer.style.display !== 'none';
+                
+                if (stillOnLogin || !stillOnApp) {
+                    return; // Ne rien faire si on est sur la page de login
+                }
+                
+                // Vérifier si on est en train de taper dans un champ (ne pas fermer le menu)
+                const target = e.target;
+                if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+                    return; // Ne pas fermer le menu si on tape dans un champ
+                }
+                
+                const touchY = e.touches[0].clientY;
+                const touchDelta = Math.abs(touchY - touchStartY);
+                
+                // Si on a commencé à scroller (touchmove), fermer le menu
+                if (touchDelta > 5 && navLinks?.classList.contains('open')) {
+                    closeMenu();
+                }
+            };
+            document.addEventListener('touchmove', touchMoveHandler, { passive: true });
+        }
+    }
+    
+    // Initialiser les listeners seulement si l'app est visible
+    setupScrollListeners();
+    
+    // Réinitialiser les listeners quand on change de page (observer les changements)
+    const observer = new MutationObserver(() => {
+        setupScrollListeners();
+    });
+    
+    // Observer les changements de classe/display sur login-page et app-container
+    const loginPage = document.getElementById('login-page');
+    const appContainer = document.getElementById('app-container');
+    if (loginPage) {
+        observer.observe(loginPage, { attributes: true, attributeFilter: ['class', 'style'] });
+    }
+    if (appContainer) {
+        observer.observe(appContainer, { attributes: true, attributeFilter: ['class', 'style'] });
+    }
 
     // Login
     document.getElementById('login-form').addEventListener('submit', async (e) => {
