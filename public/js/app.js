@@ -1049,12 +1049,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, 200);
                 }
                 
-                // Avancer le workflow après avoir affiché le plan
-                if (typeof advanceWorkflow === 'function') {
-                    setTimeout(() => {
-                        advanceWorkflow();
-                    }, 500);
-                }
+                // Ne pas appeler advanceWorkflow() ici car on veut rester sur la page workout
+                // L'utilisateur vient de générer son plan et veut le voir
             } else {
                 // Si aucun plan n'a pu être chargé, afficher un message d'erreur
                 alert(`Erreur: Impossible de générer le plan d'entraînement. Veuillez réessayer.`);
