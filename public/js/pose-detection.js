@@ -69,28 +69,16 @@ function onPoseResults(results) {
             if (visibleLandmarks.length >= 5) {
                 const analysis = analyzePosture(results.poseLandmarks, canvas.width, canvas.height);
 
+                // Dessiner uniquement les landmarks et les connexions (référence)
                 const overlayColor = getScoreColor(analysis?.score);
                 drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: overlayColor, lineWidth: 4 });
                 drawLandmarks(ctx, results.poseLandmarks, { color: overlayColor, lineWidth: 2, radius: 4 });
 
                 window.evalCurrentLandmarks = results.poseLandmarks;
-
-                renderPostureOverlay(ctx, canvas.width, canvas.height, analysis);
             } else {
+                // Pas assez de landmarks détectés - ne rien afficher
                 overlayLastScore = null;
                 overlayLastFeedback = [];
-                ctx.fillStyle = 'rgba(0,0,0,0.55)';
-                ctx.fillRect(12, 12, Math.min(canvas.width - 24, 320), 64);
-        // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.translate(-canvas.width, 0);
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '600 18px "Inter", Arial, sans-serif';
-        ctx.fillText('Positionnez-vous face à la caméra', 28, 52);
-        
-        ctx.restore();
             }
         }
 
@@ -451,91 +439,10 @@ function getExerciseSpecificPostureAdvice(exerciseName, score, feedback = []) {
 }
 
 function renderPostureOverlay(ctx, width, height, analysis) {
-    const score = analysis?.score ?? overlayLastScore;
-    const feedback = analysis?.feedback ?? overlayLastFeedback;
-    const label = getScoreLabel(score);
-    const color = getScoreColor(score);
-    const primaryFeedback = getPrimaryFeedback(feedback);
-    const severity = primaryFeedback?.severity || (feedback && feedback.length ? 'low' : 'ok');
-    overlayLastSeverity = severity;
-
-    // Ne rien afficher si aucune donnée récente
-    if (score === null || score === undefined) {
-        return;
-    }
-
-    // Récupérer l'exercice en cours
-    const currentExerciseName = document.getElementById('current-exercise-name')?.textContent || 
-                                window.currentExerciseName || null;
-
-    ctx.save();
-
-    const hudWidth = Math.min(260, width - 32);
-    const hudHeight = 86;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    fillRoundedRect(ctx, 16, 16, hudWidth, hudHeight, 12);
-
-    // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.translate(-width, 0);
-    
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '600 22px "Inter", Arial, sans-serif';
-    ctx.fillText(`Score: ${Math.round(score)}/100`, 32, 52);
-
-    ctx.font = '500 15px "Inter", Arial, sans-serif';
-    ctx.fillStyle = color;
-    ctx.fillText(label, 32, 74);
-    
-    ctx.restore();
-
-    // Générer le conseil postural dynamique selon l'exercice
-    const exerciseAdvice = getExerciseSpecificPostureAdvice(currentExerciseName, score, feedback);
-    const adviceMessage = primaryFeedback 
-        ? primaryFeedback.message.replace(/^[⚠️💡✓ ]+/g, '')
-        : (exerciseAdvice || 'Maintenez une posture correcte.');
-
-    if (primaryFeedback || exerciseAdvice) {
-        const feedbackHeight = 90;
-        const yStart = height - feedbackHeight - 24;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        fillRoundedRect(ctx, 16, yStart, width - 32, feedbackHeight, 12);
-
-        // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.translate(-width, 0);
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '600 18px "Inter", Arial, sans-serif';
-        ctx.fillText('Conseil posture', 32, yStart + 34);
-
-        ctx.font = '400 15px "Inter", Arial, sans-serif';
-        wrapCanvasText(ctx, adviceMessage, 32, yStart + 60, width - 64, 22);
-        
-        ctx.restore();
-    } else {
-        const tipHeight = 58;
-        const yStart = height - tipHeight - 24;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-        fillRoundedRect(ctx, 16, yStart, 210, tipHeight, 10);
-
-        // Le canvas est inversé horizontalement (scaleX(-1) en CSS), donc on doit inverser le texte
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.translate(-width, 0);
-        
-        ctx.fillStyle = '#2ecc71';
-        ctx.font = '600 16px "Inter", Arial, sans-serif';
-        ctx.fillText('✓ Posture stable', 32, yStart + 32);
-        
-        ctx.restore();
-    }
-
-    drawStatusIndicator(ctx, width, height, severity, color);
-
-    ctx.restore();
+    // Simplifié : on ne garde que les landmarks et les connexions
+    // Les landmarks et connexions sont déjà dessinés dans onPoseResults
+    // Cette fonction ne fait plus rien pour simplifier l'affichage
+    // Les landmarks et la référence (connexions) sont visibles directement sur le canvas
 }
 
 function fillRoundedRect(ctx, x, y, w, h, r) {
@@ -796,8 +703,17 @@ function displayPostureFeedback(feedback, postureScore = null) {
         return;
     }
 
+    // Récupérer l'exercice en cours pour le conseil dynamique
+    const currentExerciseName = document.getElementById('current-exercise-name')?.textContent || 
+                                window.currentExerciseName || null;
+    
+    // Générer le conseil postural dynamique selon l'exercice
+    const exerciseAdvice = getExerciseSpecificPostureAdvice(currentExerciseName, postureScore || 100, feedback);
+
     if (feedback.length === 0) {
-        feedbackBox.innerHTML = `<p style="color: green;">✓ Posture correcte</p>`;
+        // Afficher le conseil spécifique à l'exercice même si la posture est correcte
+        const adviceText = exerciseAdvice || 'Maintenez une posture correcte.';
+        feedbackBox.innerHTML = `<p style="color: green;">✓ Posture correcte</p><p style="margin-top: 0.5rem; color: var(--text-color);">💡 ${adviceText}</p>`;
         feedbackBox.className = 'feedback-box';
     } else {
         const errorFeedback = feedback.find(f => f.type === 'error' || f.severity === 'high');
@@ -806,14 +722,26 @@ function displayPostureFeedback(feedback, postureScore = null) {
         let html = '';
         if (errorFeedback) {
             html = `<p style="font-weight: bold;">${errorFeedback.message}</p>`;
+            // Ajouter le conseil spécifique à l'exercice
+            if (exerciseAdvice) {
+                html += `<p style="margin-top: 0.5rem;">💡 ${exerciseAdvice}</p>`;
+            }
             feedbackBox.innerHTML = html;
             feedbackBox.className = 'feedback-box error';
         } else if (warningFeedback) {
             html = `<p>${warningFeedback.message}</p>`;
+            // Ajouter le conseil spécifique à l'exercice
+            if (exerciseAdvice) {
+                html += `<p style="margin-top: 0.5rem;">💡 ${exerciseAdvice}</p>`;
+            }
             feedbackBox.innerHTML = html;
             feedbackBox.className = 'feedback-box warning';
         } else {
             html = feedback.map(f => `<p>${f.message}</p>`).join('');
+            // Ajouter le conseil spécifique à l'exercice
+            if (exerciseAdvice) {
+                html += `<p style="margin-top: 0.5rem;">💡 ${exerciseAdvice}</p>`;
+            }
             feedbackBox.innerHTML = html;
             feedbackBox.className = 'feedback-box';
         }

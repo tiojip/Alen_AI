@@ -744,48 +744,11 @@
             <div id="workout-active" class="card hidden">
                 <h3 id="current-exercise-name"></h3>
                 
-                <!-- Indicateurs de progression (FR-09) -->
-                <div class="workout-progress-indicators">
-                    <div class="progress-indicator">
-                        <span class="indicator-label">Exercice</span>
-                        <span id="exercise-counter" class="indicator-value">1/1</span>
-                    </div>
-                    <div class="progress-indicator">
-                        <span class="indicator-label">Série</span>
-                        <span id="set-counter" class="indicator-value">1/1</span>
-                    </div>
-                    <div class="progress-indicator">
-                        <span class="indicator-label">Répétitions</span>
-                        <span id="rep-counter" class="indicator-value">0/0</span>
-                    </div>
-                </div>
-                
+                <!-- Affichage caméra directement après le nom de l'exercice -->
                 <div class="workout-video-container">
                     <video id="workout-video" autoplay playsinline></video>
                     <canvas id="workout-canvas"></canvas>
                     <div id="workout-exercise-gif" class="workout-exercise-gif"></div>
-                </div>
-                
-                <!-- Compte à rebours pour repos (FR-09) -->
-                <div id="rest-countdown" class="rest-countdown hidden">
-                    <div class="countdown-overlay">
-                        <h2>Repos</h2>
-                        <div id="countdown-display" class="countdown-display">00</div>
-                        <p>Prochain exercice dans...</p>
-                    </div>
-                </div>
-                
-                <div id="workout-feedback" class="feedback-box"></div>
-                
-                <!-- Indicateur de score postural en temps réel (FR-10) -->
-                <div id="posture-score-indicator" class="posture-score-indicator hidden">
-                    <span class="posture-score-label">Score postural:</span>
-                    <span id="posture-score-value" class="posture-score-value">--</span>
-                </div>
-                
-                <!-- Barre de progression de l'exercice (FR-09) -->
-                <div class="exercise-progress-bar">
-                    <div id="exercise-progress-fill" class="exercise-progress-fill"></div>
                 </div>
                 
                 <div class="workout-controls">
@@ -810,6 +773,45 @@
                         <span class="btn-text-sr">Enregistrer</span>
                     </button>
                 </div>
+                
+                <!-- Indicateurs de progression (FR-09) - après les boutons d'interactions -->
+                <div class="workout-progress-indicators">
+                    <div class="progress-indicator">
+                        <span class="indicator-label">Exercice</span>
+                        <span id="exercise-counter" class="indicator-value">1/1</span>
+                    </div>
+                    <div class="progress-indicator">
+                        <span class="indicator-label">Série</span>
+                        <span id="set-counter" class="indicator-value">1/1</span>
+                    </div>
+                    <div class="progress-indicator">
+                        <span class="indicator-label">Répétitions</span>
+                        <span id="rep-counter" class="indicator-value">0/0</span>
+                    </div>
+                </div>
+                
+                <!-- Compte à rebours pour repos (FR-09) -->
+                <div id="rest-countdown" class="rest-countdown hidden">
+                    <div class="countdown-overlay">
+                        <h2>Repos</h2>
+                        <div id="countdown-display" class="countdown-display">00</div>
+                        <p>Prochain exercice dans...</p>
+                    </div>
+                </div>
+                
+                <div id="workout-feedback" class="feedback-box"></div>
+                
+                <!-- Indicateur de score postural en temps réel (FR-10) -->
+                <div id="posture-score-indicator" class="posture-score-indicator hidden">
+                    <span class="posture-score-label">Score postural:</span>
+                    <span id="posture-score-value" class="posture-score-value">--</span>
+                </div>
+                
+                <!-- Barre de progression de l'exercice (FR-09) -->
+                <div class="exercise-progress-bar">
+                    <div id="exercise-progress-fill" class="exercise-progress-fill"></div>
+                </div>
+                
                 <div class="workout-timer">
                     <span id="timer-display">00:00</span>
                 </div>
