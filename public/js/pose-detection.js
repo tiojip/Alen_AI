@@ -322,12 +322,13 @@ function analyzePosture(landmarks, width, height) {
 
 function getScoreColor(score) {
     if (typeof score !== 'number') {
-        return '#00FF00';
+        return '#00FF00'; // Vert par défaut si pas de score
     }
-    if (score >= 90) return '#2ecc71';
-    if (score >= 75) return '#f1c40f';
-    if (score >= 60) return '#e67e22';
-    return '#e74c3c';
+    // Vert si le mouvement est correct (score >= 50), rouge sinon
+    if (score >= 50) {
+        return '#2ecc71'; // Vert pour mouvement correct
+    }
+    return '#e74c3c'; // Rouge pour mouvement incorrect
 }
 
 function getScoreLabel(score) {
