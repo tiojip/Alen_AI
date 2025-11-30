@@ -1260,29 +1260,45 @@ function collectSessionData(status = 'completed') {
     const exercisesCompleted = Math.min(currentExerciseIndex, currentWorkout.exercises.length);
 
     // Nettoyer les données posturales pour éviter les références circulaires
+    // Limiter à un échantillon pour réduire la taille du payload
     let cleanedPostureData = [];
     if (typeof workoutPostureData !== 'undefined' && Array.isArray(workoutPostureData)) {
-        cleanedPostureData = workoutPostureData.map(data => {
+        // Limiter à 100 échantillons maximum pour éviter un payload trop volumineux
+        const maxSamples = 100;
+        const sampleInterval = Math.max(1, Math.floor(workoutPostureData.length / maxSamples));
+        const sampledData = workoutPostureData.filter((_, index) => index % sampleInterval === 0 || index === workoutPostureData.length - 1);
+        
+        cleanedPostureData = sampledData.slice(0, maxSamples).map(data => {
             // Créer un objet propre sans références circulaires
             return {
                 timestamp: data.timestamp || Date.now(),
                 score: typeof data.score === 'number' ? data.score : 0,
-                errors: Array.isArray(data.errors) ? data.errors : []
+                errors: Array.isArray(data.errors) ? data.errors.slice(0, 5) : [] // Limiter à 5 erreurs max par échantillon
                 // Ne pas inclure landmarks pour éviter les données trop volumineuses
             };
         });
     }
 
+    // Limiter la taille des exercices pour réduire le payload
+    const exercises = Array.isArray(currentWorkout.exercises) ? currentWorkout.exercises.map(ex => ({
+        name: ex.name || 'Unknown',
+        sets: ex.sets || null,
+        reps: ex.reps || null,
+        duration: ex.duration || null,
+        rest: ex.rest || null
+        // Exclure les autres propriétés pour réduire la taille
+    })) : [];
+    
     return {
         workout: {
             day: currentWorkout.day || 'unknown',
-            exercises: Array.isArray(currentWorkout.exercises) ? currentWorkout.exercises : [],
-            skippedExercises: Array.isArray(currentWorkout.skippedExercises) ? currentWorkout.skippedExercises : [],
+            exercises: exercises,
+            skippedExercises: Array.isArray(currentWorkout.skippedExercises) ? currentWorkout.skippedExercises.slice(0, 10) : [],
             status,
             startedAt: currentWorkout.startTime || new Date(startedAt).toISOString(),
             endedAt: new Date().toISOString(),
             currentExerciseIndex: typeof currentExerciseIndex === 'number' ? currentExerciseIndex : 0,
-            totalExercises: Array.isArray(currentWorkout.exercises) ? currentWorkout.exercises.length : 0
+            totalExercises: exercises.length
         },
         duration: typeof durationSeconds === 'number' && durationSeconds >= 0 ? durationSeconds : 0,
         postureScore: typeof postureScore === 'number' && !isNaN(postureScore) ? postureScore : 0,

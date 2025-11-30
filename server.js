@@ -17,7 +17,8 @@ console.log(`Clé API OpenAI détectée : ${HAS_OPENAI_KEY ? 'oui' : 'non'}`);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Augmenter la limite pour les données de séance
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Headers de sécurité - CSP désactivée temporairement pour le développement
 // Pour réactiver en production, décommenter et ajuster selon les besoins
