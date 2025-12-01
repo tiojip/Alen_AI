@@ -744,26 +744,51 @@ function initChat() {
             }
         } catch (error) {
             console.error('Erreur chat:', error);
+            responseReceived = true; // Marquer comme reçu pour éviter le message "En attente"
             if (currentMessageDiv) {
                 currentMessageDiv.classList.remove('streaming');
-                const errorMsg = error.message || 'Désolé, une erreur est survenue. Veuillez réessayer.';
+                let errorMsg = 'Désolé, une erreur est survenue. Veuillez réessayer.';
+                
+                // Messages d'erreur plus spécifiques
+                if (error.message) {
+                    if (error.message.includes('Timeout')) {
+                        errorMsg = 'La réponse prend trop de temps. Veuillez réessayer.';
+                    } else if (error.message.includes('Non authentifié')) {
+                        errorMsg = 'Session expirée. Veuillez vous reconnecter.';
+                    } else if (error.message.includes('Payload Too Large')) {
+                        errorMsg = 'Le message est trop volumineux. Veuillez le raccourcir.';
+                    } else {
+                        errorMsg = error.message;
+                    }
+                }
+                
                 updateMessage(currentMessageDiv, errorMsg);
             } else {
                 addMessage('Désolé, une erreur est survenue. Veuillez réessayer.', false);
             }
         } finally {
-            // S'assurer qu'on affiche quelque chose si aucune réponse n'a été reçue
+            // S'assurer qu'on affiche quelque chose si aucune réponse n'a été reçue après un délai
             if (!responseReceived && currentMessageDiv) {
-                console.warn('Aucune réponse reçue, affichage message par défaut');
-                currentMessageDiv.classList.remove('streaming');
-                updateMessage(currentMessageDiv, 'En attente de réponse...');
+                // Attendre un peu avant d'afficher le message d'attente
+                setTimeout(() => {
+                    if (!responseReceived && currentMessageDiv) {
+                        console.warn('Aucune réponse reçue après délai, affichage message d\'erreur');
+                        currentMessageDiv.classList.remove('streaming');
+                        updateMessage(currentMessageDiv, 'Erreur de connexion. Veuillez réessayer.');
+                        responseReceived = true;
+                    }
+                }, 10000); // 10 secondes
             }
             
             // Réactiver l'input
             chatInput.disabled = false;
             btnSend.disabled = false;
             chatInput.focus();
-            currentMessageDiv = null;
+            
+            // Ne pas réinitialiser currentMessageDiv immédiatement si on attend encore
+            if (responseReceived) {
+                currentMessageDiv = null;
+            }
         }
     }
 

@@ -2605,7 +2605,6 @@ app.post('/api/progress', authenticateToken, (req, res) => {
 app.post('/api/chat', authenticateToken, async (req, res) => {
   const { message, stream = true } = req.body;
   const startTime = Date.now();
-  const userContext = await loadUserContext(req.user.id);
   
   // Safeguards: Vérifier que le message n'est pas vide ou trop long
   if (!message || message.trim().length === 0) {
@@ -2613,6 +2612,16 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
   }
   if (message.length > 1000) {
     return res.status(400).json({ error: 'Message trop long (max 1000 caractères)' });
+  }
+  
+  // Charger le contexte utilisateur avec gestion d'erreur
+  let userContext = null;
+  try {
+    userContext = await loadUserContext(req.user.id);
+  } catch (error) {
+    console.error('Erreur chargement contexte utilisateur:', error);
+    // Continuer avec un contexte vide plutôt que d'échouer
+    userContext = null;
   }
   
   // Construire le message système avec contexte (FR-14)
@@ -2630,52 +2639,75 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         
-        const stream = await openai.chat.completions.create({
-          model: 'gpt-4o-mini', // Utiliser un modèle plus récent et performant
-          messages: [
-            {
-              role: 'system',
-              content: systemMessage
-            },
-            {
-              role: 'user',
-              content: message
+        try {
+          const stream = await openai.chat.completions.create({
+            model: 'gpt-4o-mini', // Utiliser un modèle plus récent et performant
+            messages: [
+              {
+                role: 'system',
+                content: systemMessage
+              },
+              {
+                role: 'user',
+                content: message
+              }
+            ],
+            max_tokens: 600, // Augmenter pour des réponses plus complètes
+            temperature: 0.8, // Augmenter pour plus de variété et personnalisation
+            stream: true
+          });
+          
+          let firstTokenTime = null;
+          let fullResponse = '';
+          let hasContent = false;
+          
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta?.content;
+            if (delta) {
+              hasContent = true;
+              if (!firstTokenTime) {
+                firstTokenTime = Date.now() - startTime;
+                // Envoyer le temps du premier token pour vérifier SLA <2s
+                res.write(`data: ${JSON.stringify({ type: 'first_token', time: firstTokenTime })}\n\n`);
+              }
+              
+              fullResponse += delta;
+              // Envoyer chaque chunk au client
+              res.write(`data: ${JSON.stringify({ type: 'chunk', content: delta })}\n\n`);
             }
-          ],
-          max_tokens: 600, // Augmenter pour des réponses plus complètes
-          temperature: 0.8, // Augmenter pour plus de variété et personnalisation
-          stream: true
-        });
-        
-        let firstTokenTime = null;
-        let fullResponse = '';
-        
-        for await (const chunk of stream) {
-          const delta = chunk.choices[0]?.delta?.content;
-          if (delta) {
-            if (!firstTokenTime) {
-              firstTokenTime = Date.now() - startTime;
-              // Envoyer le temps du premier token pour vérifier SLA <2s
-              res.write(`data: ${JSON.stringify({ type: 'first_token', time: firstTokenTime })}\n\n`);
-            }
-            
-            fullResponse += delta;
-            // Envoyer chaque chunk au client
-            res.write(`data: ${JSON.stringify({ type: 'chunk', content: delta })}\n\n`);
           }
+          
+          // S'assurer qu'on envoie toujours un message 'done', même si aucun contenu n'a été reçu
+          const totalTime = Date.now() - startTime;
+          if (!hasContent && !fullResponse) {
+            // Si aucune réponse n'a été générée, utiliser le fallback
+            fullResponse = getFallbackChatResponse(message);
+          }
+          
+          // Envoyer la réponse complète et les métriques
+          res.write(`data: ${JSON.stringify({ 
+            type: 'done', 
+            response: fullResponse || 'Désolé, je n\'ai pas pu générer de réponse. Veuillez réessayer.',
+            firstTokenTime: firstTokenTime,
+            totalTime: totalTime,
+            slaMet: firstTokenTime ? firstTokenTime < 2000 : false,
+            source: hasContent ? 'ai' : 'fallback'
+          })}\n\n`);
+          res.end();
+          return; // Important: arrêter l'exécution ici
+        } catch (streamError) {
+          console.error('Erreur streaming chat IA:', streamError);
+          // En cas d'erreur pendant le streaming, envoyer une réponse d'erreur via SSE
+          const fallbackResponse = getFallbackChatResponse(message);
+          res.write(`data: ${JSON.stringify({ 
+            type: 'done', 
+            response: fallbackResponse,
+            source: 'fallback',
+            error: streamError.message
+          })}\n\n`);
+          res.end();
+          return;
         }
-        
-        // Envoyer la réponse complète et les métriques
-        const totalTime = Date.now() - startTime;
-        res.write(`data: ${JSON.stringify({ 
-          type: 'done', 
-          response: fullResponse,
-          firstTokenTime: firstTokenTime,
-          totalTime: totalTime,
-          slaMet: firstTokenTime ? firstTokenTime < 2000 : false
-        })}\n\n`);
-        res.end();
-        return; // Important: arrêter l'exécution ici
       } else {
         // Mode non-streaming
         const completion = await openai.chat.completions.create({
@@ -2712,7 +2744,17 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
   // Fallback uniquement si OpenAI n'est pas disponible ou en cas d'erreur
   const fallbackResponse = getFallbackChatResponse(message);
   if (stream) {
-    return res.json({ response: fallbackResponse, source: 'fallback' });
+    // Si le streaming était demandé mais qu'on est en fallback, envoyer via SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.write(`data: ${JSON.stringify({ 
+      type: 'done', 
+      response: fallbackResponse, 
+      source: 'fallback'
+    })}\n\n`);
+    res.end();
+    return;
   }
   res.json({ 
     response: fallbackResponse, 

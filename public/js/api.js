@@ -286,9 +286,18 @@ class API {
                 let fullResponse = '';
                 
                 try {
+                    // Timeout pour éviter d'attendre indéfiniment
+                    const timeout = setTimeout(() => {
+                        reader.cancel();
+                        throw new Error('Timeout: La réponse du serveur prend trop de temps');
+                    }, 30000); // 30 secondes max
+                    
                     while (true) {
                         const { done, value } = await reader.read();
-                        if (done) break;
+                        if (done) {
+                            clearTimeout(timeout);
+                            break;
+                        }
                         
                         buffer += decoder.decode(value, { stream: true });
                         const lines = buffer.split('\n');
@@ -313,13 +322,14 @@ class API {
                                             onChunk(data.content, fullResponse);
                                         }
                                     } else if (data.type === 'done') {
+                                        clearTimeout(timeout);
                                         if (onComplete) {
                                             onComplete({
                                                 response: data.response || fullResponse,
                                                 firstTokenTime: data.firstTokenTime || firstTokenTime,
                                                 totalTime: data.totalTime,
                                                 slaMet: data.slaMet,
-                                                source: 'ai'
+                                                source: data.source || 'ai'
                                             });
                                         }
                                         return {
@@ -327,7 +337,7 @@ class API {
                                             firstTokenTime: data.firstTokenTime || firstTokenTime,
                                             totalTime: data.totalTime,
                                             slaMet: data.slaMet,
-                                            source: 'ai'
+                                            source: data.source || 'ai'
                                         };
                                     }
                                 } catch (e) {
@@ -336,11 +346,33 @@ class API {
                             }
                         }
                     }
+                    
+                    clearTimeout(timeout);
+                } catch (streamError) {
+                    console.error('Erreur lecture stream:', streamError);
+                    // Si on a déjà reçu une partie de la réponse, l'utiliser
+                    if (fullResponse) {
+                        if (onComplete) {
+                            onComplete({
+                                response: fullResponse,
+                                firstTokenTime: firstTokenTime,
+                                totalTime: 0,
+                                slaMet: firstTokenTime ? firstTokenTime < 2000 : false,
+                                source: 'ai'
+                            });
+                        }
+                        return {
+                            response: fullResponse,
+                            firstTokenTime: firstTokenTime,
+                            source: 'ai'
+                        };
+                    }
+                    throw streamError;
                 } finally {
                     reader.releaseLock();
                 }
                 
-                // Si on arrive ici sans 'done', retourner la réponse accumulée
+                // Si on arrive ici sans 'done', retourner la réponse accumulée si on a reçu des chunks
                 if (fullResponse) {
                     if (onComplete) {
                         onComplete({
@@ -357,6 +389,9 @@ class API {
                         source: 'ai'
                     };
                 }
+                
+                // Si aucune réponse n'a été reçue, lancer une erreur
+                throw new Error('Aucune réponse reçue du serveur');
             } else {
                 // Mode non-streaming (fallback)
                 const data = await response.json();
